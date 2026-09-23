@@ -8,7 +8,7 @@ import os
 from .audio import extract_mono_wav
 from .resources import model_paths
 from .subtitle import SubtitleEntry, renumber
-from .verbatim import split_entry_by_boundaries
+from .verbatim import has_formatting_markup, split_entry_by_boundaries
 
 
 @dataclass(slots=True)
@@ -137,6 +137,7 @@ def apply_speaker_segments(
         distinct = {x[1] for x in overlaps}
         safe_split = (
             split_on_change
+            and not has_formatting_markup(entry.text)
             and len(distinct) > 1
             and len(overlaps) <= 4
             and all((end - start) >= 420 for start, _, end in overlaps)
@@ -154,6 +155,12 @@ def apply_speaker_segments(
         else:
             reason = ""
             if len(distinct) > 1:
-                reason = "Ada lebih dari satu speaker pada caption ini, tetapi pemisahan otomatis dinilai belum aman."
+                if has_formatting_markup(entry.text):
+                    reason = (
+                        "Ada lebih dari satu speaker dan caption memakai tag format seperti <i>. "
+                        "Pemisahan otomatis ditahan agar tag tidak rusak."
+                    )
+                else:
+                    reason = "Ada lebih dari satu speaker pada caption ini, tetapi pemisahan otomatis dinilai belum aman."
             output.append(entry.clone(speaker=dominant, speaker_confidence=confidence, review_reason=reason))
     return renumber(output)
