@@ -19,8 +19,8 @@ def test_gemini_sends_caption_without_terminal_punctuation():
     assert needs_gemini_punctuation(make("aku mau pulang"))
 
 
-def test_gemini_sends_caption_marked_for_review():
-    assert needs_gemini_punctuation(make("Aku mau pulang.", review_reason="Speaker perlu dicek."))
+def test_gemini_skips_clean_caption_with_speaker_only_review_warning():
+    assert not needs_gemini_punctuation(make("Aku mau pulang.", review_reason="Speaker perlu dicek."))
 
 
 def test_gemini_detects_indonesian_question_with_wrong_period():
@@ -47,3 +47,11 @@ def test_gemini_cache_material_changes_with_neighbor_context():
         SubtitleEntry(3, 2000, 3000, "Tidak ada.", speaker="Speaker 1"),
     ]
     assert _cache_material(a, 1) != _cache_material(b, 1)
+
+
+def test_gemini_detects_common_indonesian_question_particle_with_wrong_period():
+    assert needs_gemini_punctuation(make("Kamu mau pergi nggak."))
+
+
+def test_gemini_detects_ke_mana_question_with_wrong_period():
+    assert needs_gemini_punctuation(make("Kamu mau ke mana."))
