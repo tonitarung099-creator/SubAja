@@ -58,3 +58,33 @@ def test_project_save_leaves_no_temp_file(tmp_path: Path):
     project.save_session(session)
     assert session.is_file()
     assert not session.with_name(session.name + ".tmp").exists()
+
+
+def test_corrupt_project_load_does_not_mutate_existing_state(tmp_path: Path):
+    project = SubtitleProject(
+        video_path=tmp_path / "old.mp4",
+        srt_path=tmp_path / "old.srt",
+        entries=[SubtitleEntry(1, 0, 1000, "Lama", original_text="Lama", source_index=1)],
+    )
+    bad = tmp_path / "bad.subaja.json"
+    bad.write_text(
+        """{
+  "version": 1,
+  "video_path": "C:/baru.mp4",
+  "srt_path": "C:/baru.srt",
+  "entries": [{"index": "rusak"}]
+}""",
+        encoding="utf-8",
+    )
+
+    try:
+        project.load_session(bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Project rusak harus ditolak.")
+
+    assert project.video_path == tmp_path / "old.mp4"
+    assert project.srt_path == tmp_path / "old.srt"
+    assert len(project.entries) == 1
+    assert project.entries[0].text == "Lama"
