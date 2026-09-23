@@ -1,4 +1,4 @@
-from app.core.gemini import estimate_gemini_work, needs_gemini_punctuation
+from app.core.gemini import _cache_material, estimate_gemini_work, needs_gemini_punctuation
 from app.core.subtitle import SubtitleEntry
 
 
@@ -33,3 +33,17 @@ def test_gemini_work_estimate_uses_batches():
     selected, requests = estimate_gemini_work(entries, batch_size=60)
     assert selected == 61
     assert requests == 2
+
+
+def test_gemini_cache_material_changes_with_neighbor_context():
+    a = [
+        SubtitleEntry(1, 0, 1000, "Jangan pergi.", speaker="Speaker 1"),
+        SubtitleEntry(2, 1000, 2000, "Apa", speaker="Speaker 2"),
+        SubtitleEntry(3, 2000, 3000, "Aku tetap pergi.", speaker="Speaker 1"),
+    ]
+    b = [
+        SubtitleEntry(1, 0, 1000, "Kamu dengar?", speaker="Speaker 1"),
+        SubtitleEntry(2, 1000, 2000, "Apa", speaker="Speaker 2"),
+        SubtitleEntry(3, 2000, 3000, "Tidak ada.", speaker="Speaker 1"),
+    ]
+    assert _cache_material(a, 1) != _cache_material(b, 1)
