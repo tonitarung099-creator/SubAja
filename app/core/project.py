@@ -51,12 +51,29 @@ class SubtitleProject:
     def load_session(self, path: str | Path):
         p = Path(path)
         payload = json.loads(p.read_text(encoding="utf-8"))
-        self.video_path = Path(payload["video_path"]) if payload.get("video_path") else None
-        self.srt_path = Path(payload["srt_path"]) if payload.get("srt_path") else None
+        if not isinstance(payload, dict):
+            raise ValueError("Project SubAja rusak: format utama harus object JSON.")
+
+        version = int(payload.get("version", 1))
+        if version != 1:
+            raise ValueError(f"Versi project SubAja belum didukung: {version}.")
+
         raw_entries = payload.get("entries", [])
         if not isinstance(raw_entries, list):
             raise ValueError("Project SubAja rusak: entries bukan daftar.")
-        self.entries = renumber(SubtitleEntry(**item) for item in raw_entries)
+
+        # Bangun seluruh state di variabel sementara. Jangan menyentuh project
+        # aktif bila satu entry saja rusak.
+        new_video_path = Path(payload["video_path"]) if payload.get("video_path") else None
+        new_srt_path = Path(payload["srt_path"]) if payload.get("srt_path") else None
+        try:
+            new_entries = renumber(SubtitleEntry(**item) for item in raw_entries)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Project SubAja rusak: data subtitle tidak valid ({exc}).") from exc
+
+        self.video_path = new_video_path
+        self.srt_path = new_srt_path
+        self.entries = new_entries
         self.project_path = p
 
     def export(
