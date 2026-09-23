@@ -113,6 +113,8 @@ class MainWindow(QMainWindow):
         layout.addLayout(file_row)
 
         splitter = QSplitter(Qt.Vertical)
+        splitter.setChildrenCollapsible(False)
+        splitter.setHandleWidth(5)
         layout.addWidget(splitter, 1)
 
         video_wrap = QWidget()
@@ -144,6 +146,7 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().setDefaultSectionSize(34)
         self.table.verticalHeader().setMinimumSectionSize(30)
         self.table.setWordWrap(True)
+        self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -172,7 +175,9 @@ class MainWindow(QMainWindow):
         review_row.addWidget(self.qc_label, 0, 3)
         table_layout.addLayout(review_row)
         splitter.addWidget(table_wrap)
-        splitter.setSizes([330, 480])
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 3)
+        splitter.setSizes([260, 360])
 
         actions = QGridLayout()
         actions.setHorizontalSpacing(8)
