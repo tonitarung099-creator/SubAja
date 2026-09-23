@@ -4,14 +4,14 @@ from pathlib import Path
 import traceback
 
 from PySide6.QtCore import Qt, QUrl, Signal, QObject, QThread
-from PySide6.QtGui import QAction, QBrush, QColor
+from PySide6.QtGui import QAction, QBrush, QColor, QFontMetrics
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
     QLabel, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
     QProgressBar, QCheckBox, QDoubleSpinBox, QSpinBox, QSplitter, QSlider,
-    QAbstractItemView
+    QAbstractItemView, QGridLayout, QSizePolicy
 )
 
 from app.core.gemini import GeminiPunctuator, GeminiQuotaError, estimate_gemini_work
@@ -46,7 +46,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SubAja - Subtitle Film Verbatim")
-        self.resize(1280, 820)
+        self.resize(1180, 760)
+        self.setMinimumSize(980, 650)
         self.project = SubtitleProject()
         self.vault = KeyVault()
         self._thread = None
@@ -93,18 +94,22 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
 
-        file_row = QHBoxLayout()
+        file_row = QGridLayout()
+        file_row.setColumnStretch(1, 1)
+        file_row.setColumnStretch(3, 1)
         self.video_label = QLabel("Video: belum dipilih")
         self.srt_label = QLabel("SRT: belum dipilih")
+        for label in (self.video_label, self.srt_label):
+            label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            label.setMinimumWidth(120)
         btn_video = QPushButton("Pilih Video")
         btn_srt = QPushButton("Pilih SRT CapCut")
         btn_video.clicked.connect(self.load_video)
         btn_srt.clicked.connect(self.load_srt)
-        file_row.addWidget(btn_video)
-        file_row.addWidget(self.video_label, 2)
-        file_row.addSpacing(12)
-        file_row.addWidget(btn_srt)
-        file_row.addWidget(self.srt_label, 2)
+        file_row.addWidget(btn_video, 0, 0)
+        file_row.addWidget(self.video_label, 0, 1)
+        file_row.addWidget(btn_srt, 0, 2)
+        file_row.addWidget(self.srt_label, 0, 3)
         layout.addLayout(file_row)
 
         splitter = QSplitter(Qt.Vertical)
@@ -114,7 +119,7 @@ class MainWindow(QMainWindow):
         video_layout = QVBoxLayout(video_wrap)
         video_layout.setContentsMargins(0, 0, 0, 0)
         self.video_widget = QVideoWidget()
-        self.video_widget.setMinimumHeight(250)
+        self.video_widget.setMinimumHeight(180)
         self.player.setVideoOutput(self.video_widget)
         video_layout.addWidget(self.video_widget)
         controls = QHBoxLayout()
@@ -136,7 +141,11 @@ class MainWindow(QMainWindow):
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(["#", "Mulai", "Selesai", "Speaker", "Teks", "QC"])
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(34)
+        self.table.verticalHeader().setMinimumSectionSize(30)
+        self.table.setWordWrap(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -147,68 +156,79 @@ class MainWindow(QMainWindow):
         self.table.cellChanged.connect(self.cell_changed)
         table_layout.addWidget(self.table)
 
-        review_row = QHBoxLayout()
+        review_row = QGridLayout()
+        review_row.setColumnStretch(3, 1)
         self.only_issues = QCheckBox("Hanya yang perlu dicek")
         self.only_issues.stateChanged.connect(self.apply_qc_filter)
-        review_row.addWidget(self.only_issues)
+        review_row.addWidget(self.only_issues, 0, 0)
         next_review = QPushButton("Berikutnya yang Perlu Dicek")
         next_review.clicked.connect(self.next_review_issue)
-        review_row.addWidget(next_review)
+        review_row.addWidget(next_review, 0, 1)
         mark_reviewed = QPushButton("Tandai Sudah Dicek")
         mark_reviewed.clicked.connect(self.mark_selected_reviewed)
-        review_row.addWidget(mark_reviewed)
+        review_row.addWidget(mark_reviewed, 0, 2)
         self.qc_label = QLabel("QC: belum dianalisis")
-        review_row.addWidget(self.qc_label)
-        review_row.addStretch(1)
+        self.qc_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        review_row.addWidget(self.qc_label, 0, 3)
         table_layout.addLayout(review_row)
         splitter.addWidget(table_wrap)
         splitter.setSizes([330, 480])
 
-        ops = QHBoxLayout()
+        actions = QGridLayout()
+        actions.setHorizontalSpacing(8)
+        actions.setVerticalSpacing(6)
+        actions.setColumnStretch(5, 1)
+
         self.speaker_btn = QPushButton("1. Analisis Speaker Lokal")
         self.speaker_btn.clicked.connect(self.analyze_speakers)
-        ops.addWidget(self.speaker_btn)
+        actions.addWidget(self.speaker_btn, 0, 0)
 
-        ops.addWidget(QLabel("Jumlah speaker (0=auto):"))
+        actions.addWidget(QLabel("Jumlah speaker:"), 0, 1)
         self.num_speakers = QSpinBox()
         self.num_speakers.setRange(0, 30)
         self.num_speakers.setValue(0)
-        ops.addWidget(self.num_speakers)
+        self.num_speakers.setToolTip("0 = otomatis")
+        actions.addWidget(self.num_speakers, 0, 2)
 
-        ops.addWidget(QLabel("Threshold:"))
+        actions.addWidget(QLabel("Threshold:"), 0, 3)
         self.threshold = QDoubleSpinBox()
         self.threshold.setRange(0.45, 0.95)
         self.threshold.setSingleStep(0.05)
         self.threshold.setValue(0.75)
-        ops.addWidget(self.threshold)
+        actions.addWidget(self.threshold, 0, 4)
 
         self.split_changes = QCheckBox("Pisahkan saat speaker berganti")
         self.split_changes.setChecked(True)
-        ops.addWidget(self.split_changes)
-        ops.addStretch(1)
-        layout.addLayout(ops)
+        actions.addWidget(self.split_changes, 0, 5)
 
-        ops2 = QHBoxLayout()
-        local_btn = QPushButton("2. Rapikan + Gaya Film")
-        local_btn.clicked.connect(self.tidy_local)
-        ops2.addWidget(local_btn)
-        api_btn = QPushButton("Gemini API (100)")
-        api_btn.clicked.connect(self.open_api_manager)
-        ops2.addWidget(api_btn)
-        gemini_btn = QPushButton("3. Gemini Hemat: Tanda Baca")
-        gemini_btn.clicked.connect(self.run_gemini)
-        ops2.addWidget(gemini_btn)
+        self.local_btn = QPushButton("2. Rapikan + Gaya Film")
+        self.local_btn.clicked.connect(self.tidy_local)
+        actions.addWidget(self.local_btn, 1, 0)
+
+        self.api_btn = QPushButton("Gemini API (100)")
+        self.api_btn.clicked.connect(self.open_api_manager)
+        actions.addWidget(self.api_btn, 1, 1, 1, 2)
+
+        self.gemini_btn = QPushButton("3. Gemini Hemat: Tanda Baca")
+        self.gemini_btn.clicked.connect(self.run_gemini)
+        actions.addWidget(self.gemini_btn, 1, 3, 1, 2)
+
         self.gemini_usage_label = QLabel("Gemini: belum dihitung")
-        self.gemini_usage_label.setToolTip("Perkiraan caption yang dikirim ke Gemini dan jumlah request batch.")
-        ops2.addWidget(self.gemini_usage_label)
-        ops2.addStretch(1)
-        self.include_speaker = QCheckBox("Tulis label speaker di SRT")
+        self.gemini_usage_label.setToolTip(
+            "Perkiraan caption yang dikirim ke Gemini dan jumlah request batch."
+        )
+        self.gemini_usage_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        actions.addWidget(self.gemini_usage_label, 1, 5)
+
+        self.include_speaker = QCheckBox("Label speaker di SRT")
         self.include_speaker.setChecked(False)
-        ops2.addWidget(self.include_speaker)
-        export_btn = QPushButton("Export SRT")
-        export_btn.clicked.connect(self.export_srt)
-        ops2.addWidget(export_btn)
-        layout.addLayout(ops2)
+        actions.addWidget(self.include_speaker, 2, 0, 1, 2)
+
+        self.export_btn = QPushButton("Export SRT")
+        self.export_btn.clicked.connect(self.export_srt)
+        actions.addWidget(self.export_btn, 2, 4)
+
+        layout.addLayout(actions)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -227,8 +247,7 @@ class MainWindow(QMainWindow):
             return
         try:
             self.project.load_video(path)
-            self.video_label.setText(Path(path).name)
-            self.video_label.setToolTip(path)
+            self._set_path_label(self.video_label, Path(path).name, path)
             self.player.setSource(QUrl.fromLocalFile(path))
             self.statusBar().showMessage("Video dimuat.")
         except Exception as exc:
@@ -240,8 +259,7 @@ class MainWindow(QMainWindow):
             return
         try:
             self.project.load_srt(path)
-            self.srt_label.setText(Path(path).name)
-            self.srt_label.setToolTip(path)
+            self._set_path_label(self.srt_label, Path(path).name, path)
             self.refresh_table()
             self.statusBar().showMessage(f"{len(self.project.entries)} subtitle dimuat.")
         except Exception as exc:
@@ -274,13 +292,15 @@ class MainWindow(QMainWindow):
         try:
             self.project.load_session(path)
             if self.project.video_path:
-                self.video_label.setText(self.project.video_path.name)
-                self.video_label.setToolTip(str(self.project.video_path))
+                self._set_path_label(
+                    self.video_label, self.project.video_path.name, str(self.project.video_path)
+                )
                 if self.project.video_path.is_file():
                     self.player.setSource(QUrl.fromLocalFile(str(self.project.video_path)))
             if self.project.srt_path:
-                self.srt_label.setText(self.project.srt_path.name)
-                self.srt_label.setToolTip(str(self.project.srt_path))
+                self._set_path_label(
+                    self.srt_label, self.project.srt_path.name, str(self.project.srt_path)
+                )
             self.refresh_table()
             self.statusBar().showMessage(f"Project dilanjutkan: {Path(path).name}")
         except Exception as exc:
@@ -293,6 +313,23 @@ class MainWindow(QMainWindow):
             self.project.save_session(self.project.project_path)
         except Exception:
             pass
+
+    @staticmethod
+    def _set_path_label(label: QLabel, name: str, full_path: str):
+        label.setProperty("full_name", name)
+        label.setToolTip(full_path)
+        width = max(120, label.width() or 260)
+        label.setText(QFontMetrics(label.font()).elidedText(name, Qt.ElideMiddle, width))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        for label in (getattr(self, "video_label", None), getattr(self, "srt_label", None)):
+            if label is None:
+                continue
+            name = label.property("full_name")
+            if name:
+                width = max(120, label.width())
+                label.setText(QFontMetrics(label.font()).elidedText(str(name), Qt.ElideMiddle, width))
 
     def refresh_table(self):
         self._qc_results = audit_entries(self.project.entries)
@@ -336,6 +373,7 @@ class MainWindow(QMainWindow):
                     if col == 5:
                         item.setToolTip(qc.message)
                     self.table.setItem(row, col, item)
+                self.table.setRowHeight(row, 48 if "\n" in e.text else 34)
         finally:
             self._updating_table = False
         self.apply_qc_filter()
