@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .style import apply_reference_film_style
 from .subtitle import SubtitleEntry, load_srt, save_srt
 
 
@@ -23,5 +24,11 @@ class SubtitleProject:
         self.entries = load_srt(p)
         self.srt_path = p
 
-    def export(self, path: str | Path, include_speaker: bool = False):
-        save_srt(path, self.entries, include_speaker=include_speaker)
+    def export(
+        self,
+        path: str | Path,
+        include_speaker: bool = False,
+        reference_film_style: bool = True,
+    ):
+        entries = apply_reference_film_style(self.entries) if reference_film_style else self.entries
+        save_srt(path, entries, include_speaker=include_speaker)
