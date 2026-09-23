@@ -124,3 +124,19 @@ def test_same_speaker_nested_segments_keep_farthest_end():
     assert len(out) == 1
     assert out[0].speaker == "Speaker 1"
     assert out[0].speaker_confidence == 1.0
+
+
+def test_speaker_confidence_is_reduced_when_audio_coverage_is_low():
+    entry = SubtitleEntry(
+        1, 0, 5000, "aku pulang sekarang",
+        original_text="aku pulang sekarang",
+        source_index=1,
+    )
+    segments = [
+        SpeakerSegment(0, 500, "Speaker 1"),
+    ]
+    out = apply_speaker_segments([entry], segments, split_on_change=True)
+    assert len(out) == 1
+    assert out[0].speaker == "Speaker 1"
+    assert 0.09 <= out[0].speaker_confidence <= 0.11
+    assert "durasi caption" in out[0].review_reason
