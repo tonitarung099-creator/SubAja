@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from .subtitle import SubtitleEntry, renumber
-from .verbatim import capitalize_first, clean_spacing, is_verbatim_safe, tidy_local
+from .verbatim import capitalize_first, clean_spacing, is_verbatim_safe, tidy_local, visible_length
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +33,7 @@ def _format_single_entry(entry: SubtitleEntry, style: FilmSubtitleStyle) -> Subt
             formatted_lines.append(style.dialogue_prefix + _single_line(body))
         candidate = "\n".join(formatted_lines)
         if (
-            all(len(line) <= style.max_chars_per_line for line in formatted_lines)
+            all(visible_length(line) <= style.max_chars_per_line for line in formatted_lines)
             and is_verbatim_safe(entry.text, candidate)
         ):
             return entry.clone(text=candidate)
@@ -80,8 +80,8 @@ def apply_reference_film_style(
 
             if (
                 different_speakers
-                and len(line_a) <= style.max_chars_per_line
-                and len(line_b) <= style.max_chars_per_line
+                and visible_length(line_a) <= style.max_chars_per_line
+                and visible_length(line_b) <= style.max_chars_per_line
                 and duration <= style.max_dialogue_cue_ms
             ):
                 combined = line_a + "\n" + line_b
