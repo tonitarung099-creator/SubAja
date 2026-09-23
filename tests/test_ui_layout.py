@@ -3,7 +3,8 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, QRect
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtCore import QUrl
+from PySide6.QtWidgets import QApplication, QPushButton, QFileDialog, QMessageBox
 
 from app.core.keyvault import KeyVault
 from app.core.subtitle import SubtitleEntry
@@ -104,4 +105,49 @@ def test_api_manager_layout_no_button_overlap_at_small_size(tmp_path, monkeypatc
     _assert_buttons_do_not_overlap(dlg)
 
     dlg.close()
+    app.processEvents()
+
+
+def test_loading_project_with_missing_video_clears_previous_player_source(tmp_path, monkeypatch):
+    app = _app()
+    win = MainWindow()
+
+    old_video = tmp_path / "old.mp4"
+    old_video.write_bytes(b"not-a-real-video")
+    win.player.setSource(QUrl.fromLocalFile(str(old_video)))
+    assert not win.player.source().isEmpty()
+
+    session = tmp_path / "missing-video.subaja.json"
+    session.write_text(
+        """{
+  "version": 1,
+  "video_path": "C:/file-yang-sudah-hilang/film.mp4",
+  "srt_path": "",
+  "entries": [
+    {"index": 1, "start_ms": 0, "end_ms": 1000, "text": "Aku pulang.", "speaker": "", "speaker_confidence": 0.0, "original_text": "Aku pulang.", "source_index": 1, "review_reason": ""}
+  ]
+}""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        staticmethod(lambda *args, **kwargs: (str(session), "SubAja Project (*.subaja.json)")),
+    )
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *args, **kwargs: warnings.append(args[2] if len(args) > 2 else "")),
+    )
+
+    win.load_project()
+    app.processEvents()
+
+    assert win.player.source().isEmpty()
+    assert "film.mp4" in win.video_label.toolTip()
+    assert warnings
+
+    win.close()
     app.processEvents()
