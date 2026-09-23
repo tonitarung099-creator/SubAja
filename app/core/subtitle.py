@@ -6,10 +6,9 @@ import re
 from typing import Iterable
 
 _TIME_RE = re.compile(r"(?P<h>\d{2}):(?P<m>\d{2}):(?P<s>\d{2})[,.](?P<ms>\d{3})")
-_BLOCK_RE = re.compile(
-    r"(?ms)^\s*(?P<idx>\d+)\s*\n"
-    r"(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})[^\n]*\n"
-    r"(?P<text>.*?)(?=\n\s*\n|\Z)"
+_TIMING_LINE_RE = re.compile(
+    r"^\s*(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*"
+    r"(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})(?:\s+.*)?$"
 )
 
 
@@ -55,24 +54,43 @@ def ms_to_timestamp(value: int) -> str:
 
 def parse_srt(text: str) -> list[SubtitleEntry]:
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff")
+    if not normalized.strip():
+        return []
+
+    blocks = re.split(r"\n\s*\n", normalized.strip())
     entries: list[SubtitleEntry] = []
-    for match in _BLOCK_RE.finditer(normalized):
-        raw = match.group("text").strip("\n")
-        idx = int(match.group("idx"))
+
+    for block_number, block in enumerate(blocks, 1):
+        lines = block.split("\n")
+        if len(lines) < 2:
+            raise ValueError(f"Blok SRT #{block_number} tidak lengkap.")
+
+        idx_text = lines[0].strip()
+        if not idx_text.isdigit():
+            raise ValueError(
+                f"Blok SRT #{block_number} memiliki nomor cue tidak valid: {idx_text!r}."
+            )
+
+        timing = _TIMING_LINE_RE.fullmatch(lines[1])
+        if timing is None:
+            raise ValueError(
+                f"Blok SRT #{block_number} memiliki timing tidak valid: {lines[1]!r}."
+            )
+
+        idx = int(idx_text)
+        raw = "\n".join(lines[2:]).strip("\n")
         entries.append(
             SubtitleEntry(
                 index=idx,
-                start_ms=timestamp_to_ms(match.group("start")),
-                end_ms=timestamp_to_ms(match.group("end")),
+                start_ms=timestamp_to_ms(timing.group("start")),
+                end_ms=timestamp_to_ms(timing.group("end")),
                 text=raw,
                 original_text=raw,
                 source_index=idx,
             )
         )
-    if not entries and normalized.strip():
-        raise ValueError("File tidak dikenali sebagai SRT yang valid.")
-    return entries
 
+    return entries
 
 def load_srt(path: str | Path) -> list[SubtitleEntry]:
     p = Path(path)
