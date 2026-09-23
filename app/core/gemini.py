@@ -108,6 +108,29 @@ def _extract_json(text: str):
     return json.loads(text)
 
 
+def _normalize_batch_response(data, allowed_ids: set[int]) -> dict[int, str]:
+    if not isinstance(data, list):
+        raise GeminiError("Respons Gemini tidak berbentuk JSON array.")
+
+    results: dict[int, str] = {}
+    for item in data:
+        if not isinstance(item, dict) or "id" not in item or "text" not in item:
+            continue
+        raw_id = item["id"]
+        if isinstance(raw_id, bool):
+            continue
+        try:
+            item_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if item_id not in allowed_ids:
+            continue
+        if item_id in results:
+            raise GeminiError(f"Respons Gemini berisi ID duplikat: {item_id}.")
+        results[item_id] = str(item["text"])
+    return results
+
+
 class GeminiPunctuator:
     def __init__(self, api_key: str, model: str = "gemini-3.8-flash"):
         if not api_key.strip():
@@ -171,7 +194,7 @@ class GeminiPunctuator:
                 config=self._low_thinking_config(json_response=True),
             )
             data = _extract_json(response.text or "")
-            return {int(x["id"]): str(x["text"]) for x in data if "id" in x and "text" in x}
+            return _normalize_batch_response(data, {e.index for e in entries})
         except Exception as exc:
             msg = str(exc)
             if "429" in msg or "RESOURCE_EXHAUSTED" in msg.upper():
