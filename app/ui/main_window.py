@@ -4,7 +4,7 @@ from pathlib import Path
 import traceback
 
 from PySide6.QtCore import Qt, QUrl, Signal, QObject, QThread
-from PySide6.QtGui import QAction, QColor
+from PySide6.QtGui import QAction, QBrush, QColor
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
@@ -322,7 +322,7 @@ class MainWindow(QMainWindow):
                     if col == 3:
                         if e.speaker:
                             hue = sum((i + 1) * ord(ch) for i, ch in enumerate(e.speaker)) % 360
-                            item.setBackground(QColor.fromHsv(hue, 55, 255))
+                            item.setBackground(QBrush(QColor.fromHsv(hue, 55, 255)))
                         if e.speaker_confidence:
                             item.setToolTip(
                                 f"Confidence speaker: {e.speaker_confidence:.0%}. "
