@@ -53,6 +53,17 @@ def dialogue_structure(text: str) -> tuple[int, ...]:
     return prefixed if len(prefixed) >= 2 else ()
 
 
+def remove_dialogue_prefixes(text: str) -> str:
+    """Remove film-style '- ' speaker markers without changing spoken words."""
+    if not dialogue_structure(text):
+        return text
+    return " ".join(
+        re.sub(r"^\s*-\s+", "", line).strip()
+        for line in text.splitlines()
+        if line.strip()
+    )
+
+
 def preserves_dialogue_structure(original: str, candidate: str) -> bool:
     signature = dialogue_structure(original)
     if not signature:
