@@ -32,7 +32,8 @@ class ApiManagerDialog(QDialog):
     def __init__(self, vault: KeyVault, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Gemini API Manager - 100 Slot")
-        self.resize(760, 620)
+        self.resize(720, 560)
+        self.setMinimumSize(620, 460)
         self.vault = vault
         self._snapshot = copy.deepcopy(vault.data)
         self._saved = False
@@ -58,6 +59,8 @@ class ApiManagerDialog(QDialog):
         self.table = QTableWidget(KeyVault.MAX_KEYS, 3)
         self.table.setHorizontalHeaderLabels(["Slot", "API Key", "Aktif"])
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(30)
+        self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
