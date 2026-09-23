@@ -38,6 +38,15 @@ def lexical_tokens(text: str) -> list[str]:
     return [m.group(0).casefold() for m in _WORD_RE.finditer(visible_text(text))]
 
 
+def formatting_signature(text: str) -> list[tuple[str, int]]:
+    """Lock every formatting tag to the same spoken-word boundary."""
+    signature: list[tuple[str, int]] = []
+    for match in _MARKUP_RE.finditer(text):
+        words_before = len(lexical_tokens(text[: match.start()]))
+        signature.append((match.group(0), words_before))
+    return signature
+
+
 def dialogue_structure(text: str) -> tuple[int, ...]:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     prefixed = tuple(i for i, line in enumerate(lines) if line.startswith("- "))
