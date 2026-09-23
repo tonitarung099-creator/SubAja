@@ -4,7 +4,7 @@ from pathlib import Path
 import traceback
 
 from PySide6.QtCore import Qt, QUrl, Signal, QObject, QThread
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QColor
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView
 )
 
-from app.core.gemini import GeminiPunctuator, GeminiQuotaError
+from app.core.gemini import GeminiPunctuator, GeminiQuotaError, estimate_gemini_work
 from app.core.keyvault import KeyVault
 from app.core.qc import audit_entries, changed_source_indices, source_group_is_safe
 from app.core.project import SubtitleProject
@@ -193,6 +193,9 @@ class MainWindow(QMainWindow):
         gemini_btn = QPushButton("3. Gemini Hemat: Tanda Baca")
         gemini_btn.clicked.connect(self.run_gemini)
         ops2.addWidget(gemini_btn)
+        self.gemini_usage_label = QLabel("Gemini: belum dihitung")
+        self.gemini_usage_label.setToolTip("Perkiraan caption yang dikirim ke Gemini dan jumlah request batch.")
+        ops2.addWidget(self.gemini_usage_label)
         ops2.addStretch(1)
         self.include_speaker = QCheckBox("Tulis label speaker di SRT")
         self.include_speaker.setChecked(False)
@@ -293,6 +296,11 @@ class MainWindow(QMainWindow):
         self.qc_label.setText(
             f"QC: {review_count} perlu dicek" + (f" • {critical_count} kritis" if critical_count else "")
         )
+        gemini_count, gemini_requests = estimate_gemini_work(self.project.entries, batch_size=60)
+        if hasattr(self, "gemini_usage_label"):
+            self.gemini_usage_label.setText(
+                f"Gemini: {gemini_count}/{len(self.project.entries)} caption • ±{gemini_requests} request"
+            )
 
         self._updating_table = True
         try:
@@ -312,8 +320,14 @@ class MainWindow(QMainWindow):
                     if col in (0, 1, 2, 5):
                         item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                     if col == 3:
+                        if e.speaker:
+                            hue = sum((i + 1) * ord(ch) for i, ch in enumerate(e.speaker)) % 360
+                            item.setBackground(QColor.fromHsv(hue, 55, 255))
                         if e.speaker_confidence:
-                            item.setToolTip(f"Confidence speaker: {e.speaker_confidence:.0%}. Bisa diedit manual jika salah.")
+                            item.setToolTip(
+                                f"Confidence speaker: {e.speaker_confidence:.0%}. "
+                                "Warna yang sama = speaker yang sama. Bisa diedit manual jika salah."
+                            )
                     if col == 5:
                         item.setToolTip(qc.message)
                     self.table.setItem(row, col, item)
