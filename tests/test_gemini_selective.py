@@ -1,4 +1,10 @@
-from app.core.gemini import _cache_material, estimate_gemini_work, needs_gemini_punctuation
+from app.core.gemini import (
+    GeminiError,
+    _cache_material,
+    _normalize_batch_response,
+    estimate_gemini_work,
+    needs_gemini_punctuation,
+)
 from app.core.subtitle import SubtitleEntry
 
 
@@ -55,3 +61,18 @@ def test_gemini_detects_common_indonesian_question_particle_with_wrong_period():
 
 def test_gemini_detects_ke_mana_question_with_wrong_period():
     assert needs_gemini_punctuation(make("Kamu mau ke mana."))
+
+
+def test_gemini_batch_response_rejects_duplicate_known_id():
+    data = [{"id": 1, "text": "A."}, {"id": 1, "text": "B."}]
+    try:
+        _normalize_batch_response(data, {1})
+    except GeminiError as exc:
+        assert "duplikat" in str(exc)
+    else:
+        raise AssertionError("ID Gemini duplikat harus ditolak.")
+
+
+def test_gemini_batch_response_ignores_unknown_ids():
+    data = [{"id": 99, "text": "asing"}, {"id": 2, "text": "Benar."}]
+    assert _normalize_batch_response(data, {2}) == {2: "Benar."}
