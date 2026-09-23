@@ -282,6 +282,8 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
+        if not path.lower().endswith(".subaja.json"):
+            path += ".subaja.json"
         try:
             self.project.save_session(path)
             self.statusBar().showMessage(f"Project tersimpan: {path}")
@@ -690,6 +692,8 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "Export SRT", default_name, "Subtitle SRT (*.srt)")
         if not path:
             return
+        if not path.lower().endswith(".srt"):
+            path += ".srt"
         changed = changed_source_indices(self.project.entries)
         if changed:
             QMessageBox.critical(
