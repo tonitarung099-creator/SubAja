@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         self._worker_title = ""
         self._updating_table = False
         self._qc_results = []
+        self._last_autosave_error = ""
 
         self.player = QMediaPlayer(self)
         self.audio_output = QAudioOutput(self)
@@ -346,8 +347,11 @@ class MainWindow(QMainWindow):
             return
         try:
             self.project.save_session(self.project.project_path)
-        except Exception:
-            pass
+            self._last_autosave_error = ""
+        except Exception as exc:
+            message = f"Autosave gagal: {exc}"
+            self._last_autosave_error = message
+            self.statusBar().showMessage(message)
 
     @staticmethod
     def _set_path_label(label: QLabel, name: str, full_path: str):
