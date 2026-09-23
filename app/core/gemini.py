@@ -26,6 +26,7 @@ class GeminiStats:
     processed: int = 0
     cached: int = 0
     rejected_word_changes: int = 0
+    missing_results: int = 0
     skipped_clean: int = 0
 
 
@@ -202,7 +203,13 @@ class GeminiPunctuator:
             batch = missing[offset : offset + batch_size]
             results = self._call_batch(batch)
             for e in batch:
-                candidate = results.get(e.index, e.text)
+                if e.index not in results:
+                    stats.missing_results += 1
+                    stats.processed += 1
+                    done += 1
+                    continue
+
+                candidate = results[e.index]
                 # Absolute word lock. Gemini output is discarded if one lexical token changes.
                 if is_verbatim_safe(e.text, candidate):
                     candidate = wrap_two_lines(candidate, max_chars=42)
