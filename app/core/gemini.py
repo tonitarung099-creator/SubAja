@@ -18,6 +18,9 @@ class GeminiQuotaError(GeminiError):
     pass
 
 
+_CACHE_CONTEXT_VERSION = "gemini-punctuation-v2"
+
+
 @dataclass(slots=True)
 class GeminiStats:
     processed: int = 0
@@ -58,6 +61,21 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
         return True
 
     return not (starts_clean and ends_clean and spacing_clean)
+
+
+def _cache_material(entries: list[SubtitleEntry], pos: int) -> str:
+    entry = entries[pos]
+    prev_text = entries[pos - 1].text if pos > 0 else ""
+    next_text = entries[pos + 1].text if pos + 1 < len(entries) else ""
+    return "\0".join(
+        (
+            _CACHE_CONTEXT_VERSION,
+            entry.speaker or "",
+            prev_text,
+            entry.text,
+            next_text,
+        )
+    )
 
 
 def estimate_gemini_work(entries: list[SubtitleEntry], batch_size: int = 60) -> tuple[int, int]:
@@ -144,13 +162,15 @@ class GeminiPunctuator:
         stats = GeminiStats()
         missing: list[SubtitleEntry] = []
         positions: dict[int, int] = {}
+        cache_materials: dict[int, str] = {}
 
         for pos, e in enumerate(out):
             positions[e.index] = pos
+            cache_materials[e.index] = _cache_material(out, pos)
             if not needs_gemini_punctuation(e):
                 stats.skipped_clean += 1
                 continue
-            cached = self.cache.get(self.model, e.text)
+            cached = self.cache.get(self.model, cache_materials[e.index])
             if cached is not None and is_verbatim_safe(e.text, cached):
                 out[pos] = e.clone(text=cached)
                 stats.cached += 1
@@ -172,7 +192,7 @@ class GeminiPunctuator:
                 if is_verbatim_safe(e.text, candidate):
                     candidate = wrap_two_lines(candidate, max_chars=42)
                     out[positions[e.index]] = e.clone(text=candidate)
-                    self.cache.put(self.model, e.text, candidate)
+                    self.cache.put(self.model, cache_materials[e.index], candidate)
                 else:
                     stats.rejected_word_changes += 1
                 stats.processed += 1
