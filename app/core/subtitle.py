@@ -36,12 +36,13 @@ def timestamp_to_ms(value: str) -> int:
     m = _TIME_RE.fullmatch(value.strip())
     if not m:
         raise ValueError(f"Invalid SRT timestamp: {value!r}")
-    return (
-        int(m.group("h")) * 3_600_000
-        + int(m.group("m")) * 60_000
-        + int(m.group("s")) * 1_000
-        + int(m.group("ms"))
-    )
+    hours = int(m.group("h"))
+    minutes = int(m.group("m"))
+    seconds = int(m.group("s"))
+    millis = int(m.group("ms"))
+    if minutes > 59 or seconds > 59:
+        raise ValueError(f"Invalid SRT timestamp: {value!r}")
+    return hours * 3_600_000 + minutes * 60_000 + seconds * 1_000 + millis
 
 
 def ms_to_timestamp(value: int) -> str:
@@ -59,6 +60,7 @@ def parse_srt(text: str) -> list[SubtitleEntry]:
 
     blocks = re.split(r"\n\s*\n", normalized.strip())
     entries: list[SubtitleEntry] = []
+    seen_indices: set[int] = set()
 
     for block_number, block in enumerate(blocks, 1):
         lines = block.split("\n")
@@ -78,12 +80,24 @@ def parse_srt(text: str) -> list[SubtitleEntry]:
             )
 
         idx = int(idx_text)
+        if idx in seen_indices:
+            raise ValueError(f"Blok SRT #{block_number} memakai nomor cue duplikat: {idx}.")
+        seen_indices.add(idx)
+
+        start_ms = timestamp_to_ms(timing.group("start"))
+        end_ms = timestamp_to_ms(timing.group("end"))
+        if end_ms <= start_ms:
+            raise ValueError(
+                f"Blok SRT #{block_number} memiliki durasi tidak valid: "
+                f"{timing.group('start')} --> {timing.group('end')}."
+            )
+
         raw = "\n".join(lines[2:]).strip("\n")
         entries.append(
             SubtitleEntry(
                 index=idx,
-                start_ms=timestamp_to_ms(timing.group("start")),
-                end_ms=timestamp_to_ms(timing.group("end")),
+                start_ms=start_ms,
+                end_ms=end_ms,
                 text=raw,
                 original_text=raw,
                 source_index=idx,
