@@ -585,7 +585,8 @@ class MainWindow(QMainWindow):
             self.progress.setValue(100)
             self.statusBar().showMessage(
                 f"Gemini hemat selesai. Dikirim {stats.processed}, dilewati {stats.skipped_clean}, "
-                f"cache {stats.cached}, ditolak Word Lock {stats.rejected_word_changes}."
+                f"cache {stats.cached}, ditolak Word Lock {stats.rejected_word_changes}, "
+                f"respons hilang {stats.missing_results}."
             )
 
         self._run_worker(task, done, "Gemini hemat: hanya caption yang masih perlu tanda baca...")
