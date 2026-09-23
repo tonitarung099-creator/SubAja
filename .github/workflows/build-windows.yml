@@ -63,6 +63,15 @@ jobs:
           if (!(Test-Path "dist/SubAja.exe")) { throw "SubAja.exe was not created" }
           Get-Item "dist/SubAja.exe" | Format-List Name,Length,FullName
 
+      - name: Smoke test packaged EXE
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $process = Start-Process -FilePath "dist/SubAja.exe" -ArgumentList "--smoke-test" -PassThru -Wait
+          if ($process.ExitCode -ne 0) {
+            throw "SubAja.exe smoke test failed with exit code $($process.ExitCode)"
+          }
+
       - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
