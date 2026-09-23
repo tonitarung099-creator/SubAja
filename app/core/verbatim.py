@@ -38,6 +38,22 @@ def lexical_tokens(text: str) -> list[str]:
     return [m.group(0).casefold() for m in _WORD_RE.finditer(visible_text(text))]
 
 
+def dialogue_structure(text: str) -> tuple[int, ...]:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    prefixed = tuple(i for i, line in enumerate(lines) if line.startswith("- "))
+    return prefixed if len(prefixed) >= 2 else ()
+
+
+def preserves_dialogue_structure(original: str, candidate: str) -> bool:
+    signature = dialogue_structure(original)
+    if not signature:
+        return True
+    candidate_lines = [line.strip() for line in candidate.splitlines() if line.strip()]
+    candidate_signature = tuple(i for i, line in enumerate(candidate_lines) if line.startswith("- "))
+    original_lines = [line.strip() for line in original.splitlines() if line.strip()]
+    return candidate_signature == signature and len(candidate_lines) == len(original_lines)
+
+
 def is_verbatim_safe(original: str, candidate: str) -> bool:
     """True when lexical words are identical and in the same order.
 
@@ -46,6 +62,7 @@ def is_verbatim_safe(original: str, candidate: str) -> bool:
     return (
         lexical_tokens(original) == lexical_tokens(candidate)
         and formatting_markup(original) == formatting_markup(candidate)
+        and preserves_dialogue_structure(original, candidate)
     )
 
 
@@ -97,6 +114,8 @@ def ensure_terminal_punctuation(text: str) -> str:
 
 def wrap_two_lines(text: str, max_chars: int = 42) -> str:
     """Wrap to at most two visually balanced lines without changing words."""
+    if dialogue_structure(text):
+        return "\n".join(line.strip() for line in text.splitlines() if line.strip())
     flat = " ".join(text.replace("\n", " ").split())
     if visible_length(flat) <= max_chars:
         return flat
