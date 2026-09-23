@@ -108,3 +108,19 @@ def test_legacy_split_of_source_dialogue_is_recovered_before_reanalysis():
     out = apply_speaker_segments(legacy, [], split_on_change=True)
     assert len(out) == 1
     assert out[0].text == original
+
+
+def test_same_speaker_nested_segments_keep_farthest_end():
+    entry = SubtitleEntry(
+        1, 0, 4000, "aku pulang sekarang",
+        original_text="aku pulang sekarang",
+        source_index=1,
+    )
+    segments = [
+        SpeakerSegment(1000, 2000, "Speaker 1"),
+        SpeakerSegment(0, 3000, "Speaker 1"),
+    ]
+    out = apply_speaker_segments([entry], segments, split_on_change=True)
+    assert len(out) == 1
+    assert out[0].speaker == "Speaker 1"
+    assert out[0].speaker_confidence == 1.0
