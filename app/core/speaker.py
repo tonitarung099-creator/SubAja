@@ -135,9 +135,14 @@ def apply_speaker_segments(
         confidence = speaker_durations[dominant] / max(1, sum(speaker_durations.values()))
 
         distinct = {x[1] for x in overlaps}
+        has_speaker_overlap = any(
+            overlaps[i][2] > overlaps[i + 1][0] + 80
+            for i in range(len(overlaps) - 1)
+        )
         safe_split = (
             split_on_change
             and not has_formatting_markup(entry.text)
+            and not has_speaker_overlap
             and len(distinct) > 1
             and len(overlaps) <= 4
             and all((end - start) >= 420 for start, _, end in overlaps)
@@ -155,7 +160,12 @@ def apply_speaker_segments(
         else:
             reason = ""
             if len(distinct) > 1:
-                if has_formatting_markup(entry.text):
+                if has_speaker_overlap:
+                    reason = (
+                        "Dua atau lebih speaker terdengar tumpang tindih pada caption ini. "
+                        "Pemisahan otomatis ditahan agar timing dan kata tidak salah."
+                    )
+                elif has_formatting_markup(entry.text):
                     reason = (
                         "Ada lebih dari satu speaker dan caption memakai tag format seperti <i>. "
                         "Pemisahan otomatis ditahan agar tag tidak rusak."
