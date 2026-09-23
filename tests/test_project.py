@@ -140,3 +140,30 @@ def test_project_rejects_out_of_range_speaker_confidence(tmp_path: Path):
         assert "speaker_confidence" in str(exc)
     else:
         raise AssertionError("Confidence di luar 0..1 harus ditolak.")
+
+
+def test_export_rechecks_word_lock_after_final_styling(tmp_path: Path, monkeypatch):
+    project = SubtitleProject(
+        entries=[
+            SubtitleEntry(
+                1, 0, 1000, "Aku pulang.",
+                original_text="Aku pulang.",
+                source_index=1,
+            )
+        ]
+    )
+
+    def unsafe_style(entries):
+        return [entries[0].clone(text="Saya pulang.")]
+
+    monkeypatch.setattr("app.core.project.apply_reference_film_style", unsafe_style)
+    out = tmp_path / "unsafe.srt"
+
+    try:
+        project.export(out, reference_film_style=True)
+    except ValueError as exc:
+        assert "Word Lock" in str(exc)
+    else:
+        raise AssertionError("Export harus diblokir jika styling mengubah kata.")
+
+    assert not out.exists()
