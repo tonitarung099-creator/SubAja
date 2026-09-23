@@ -86,6 +86,8 @@ def apply_reference_film_style(
             ):
                 combined = line_a + "\n" + line_b
                 original = first.original_text or second.original_text
+                reasons = [x for x in (first.review_reason, second.review_reason) if x]
+                combined_reason = " ".join(dict.fromkeys(reasons))
                 if not original or is_verbatim_safe(original, combined):
                     out.append(
                         first.clone(
@@ -94,7 +96,7 @@ def apply_reference_film_style(
                             text=combined,
                             speaker=f"{first.speaker} | {second.speaker}",
                             speaker_confidence=min(first.speaker_confidence, second.speaker_confidence),
-                            review_reason="",
+                            review_reason=combined_reason,
                         )
                     )
                     i = j
