@@ -25,6 +25,7 @@ class SubtitleProject:
         p = Path(path)
         self.entries = load_srt(p)
         self.srt_path = p
+        self.project_path = None
 
     def save_session(self, path: str | Path):
         p = Path(path)
