@@ -296,18 +296,46 @@ class MainWindow(QMainWindow):
             return
         try:
             self.project.load_session(path)
+
+            # Selalu bersihkan state project sebelumnya agar video lama tidak
+            # tetap tampil ketika file sumber project baru sudah dipindah/hilang.
+            self.player.stop()
+            self.player.setSource(QUrl())
+            self.video_label.setProperty("full_name", "")
+            self.video_label.setText("Video: belum tersedia")
+            self.video_label.setToolTip("")
+            self.srt_label.setProperty("full_name", "")
+            self.srt_label.setText("SRT: data tersimpan di project")
+            self.srt_label.setToolTip("")
+
+            missing: list[str] = []
             if self.project.video_path:
                 self._set_path_label(
                     self.video_label, self.project.video_path.name, str(self.project.video_path)
                 )
                 if self.project.video_path.is_file():
                     self.player.setSource(QUrl.fromLocalFile(str(self.project.video_path)))
+                else:
+                    missing.append(f"Video tidak ditemukan: {self.project.video_path}")
+
             if self.project.srt_path:
                 self._set_path_label(
                     self.srt_label, self.project.srt_path.name, str(self.project.srt_path)
                 )
+                if not self.project.srt_path.is_file():
+                    missing.append(f"SRT sumber tidak ditemukan: {self.project.srt_path}")
+
             self.refresh_table()
-            self.statusBar().showMessage(f"Project dilanjutkan: {Path(path).name}")
+            if missing:
+                QMessageBox.warning(
+                    self,
+                    "File sumber project tidak ditemukan",
+                    "\n".join(missing)
+                    + "\n\nData subtitle hasil kerja tetap dimuat. Pilih video lagi sebelum analisis/review audio.",
+                )
+                self.statusBar().showMessage("Project dimuat, tetapi ada file sumber yang tidak ditemukan.")
+            else:
+                self.statusBar().showMessage(f"Project dilanjutkan: {Path(path).name}")
         except Exception as exc:
             QMessageBox.critical(self, "Project", str(exc))
 
