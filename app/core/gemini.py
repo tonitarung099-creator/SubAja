@@ -50,12 +50,13 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
         "ke mana ", "kemana ", "dari mana ", "darimana ",
     )
     question_phrases = (
-        " kenapa ", " bagaimana ", " berapa ", " siapa ", " kapan ",
-        " di mana ", " dimana ", " ke mana ", " kemana ",
-        " dari mana ", " darimana ",
+        "kenapa", "bagaimana", "berapa", "siapa", "kapan",
+        "di mana", "dimana", "ke mana", "kemana",
+        "dari mana", "darimana",
     )
-    without_terminal = lower.rstrip(".!… ").strip()
+    without_terminal = lower.rstrip(".!?… ").strip()
     words = without_terminal.split()
+    padded = f" {without_terminal} "
     trailing_question_particle = (
         len(words) > 1
         and any(
@@ -64,8 +65,8 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
         )
     )
     looks_like_question = (
-        lower.startswith(question_starters)
-        or any(token in f" {lower} " for token in question_phrases)
+        without_terminal.startswith(question_starters)
+        or any(f" {phrase} " in padded for phrase in question_phrases)
         or trailing_question_particle
     )
     if looks_like_question and not visible.endswith(("?", '?"', "?”")):
