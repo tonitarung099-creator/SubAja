@@ -1,0 +1,51 @@
+name: Bootstrap SubAja v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/bootstrap-subaja.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  copy-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct verified SubAja v2 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/subaja/base_parts /tmp/subaja/patch_parts /tmp/subaja/base /tmp/subaja/patch
+
+          for p in aa ab ac ad ae; do
+            curl -fsSL "https://raw.githubusercontent.com/tonitarung099-creator/Update-P5-Edit-Aja/subaja-app/subaja-build/part-$p.txt" -o "/tmp/subaja/base_parts/part-$p.txt"
+          done
+          cat /tmp/subaja/base_parts/part-*.txt | tr -d '\r\n' | base64 -d > /tmp/subaja/base.zip
+          echo "caef54cc8ca233e2c00d97ec0520775d9ca555d443ea7abc0ce0fa72a1379c1a  /tmp/subaja/base.zip" | sha256sum -c -
+          unzip -q /tmp/subaja/base.zip -d /tmp/subaja/base
+
+          for p in 00 01 02; do
+            curl -fsSL "https://raw.githubusercontent.com/tonitarung099-creator/Update-P5-Edit-Aja/subaja-app/subaja-build/v2-patch-part-$p.txt" -o "/tmp/subaja/patch_parts/part-$p.txt"
+          done
+          cat /tmp/subaja/patch_parts/part-*.txt | tr -d '\r\n' | base64 -d > /tmp/subaja/patch.zip
+          echo "0ba1a956ced4401a9e25d20d7d9934710bd3e92ac2ea16f02f76a5db6b295038  /tmp/subaja/patch.zip" | sha256sum -c -
+          unzip -q /tmp/subaja/patch.zip -d /tmp/subaja/patch
+
+          cp -a /tmp/subaja/base/SubAja/. .
+          cp -a /tmp/subaja/patch/SubAja/. .
+
+          rm -f .github/workflows/bootstrap-subaja.yml
+
+      - name: Commit copied project
+        shell: bash
+        run: |
+          git config user.name "SubAja Bootstrap"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Import SubAja v2"
+          git push origin main
