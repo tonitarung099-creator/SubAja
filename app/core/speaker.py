@@ -116,20 +116,65 @@ def _segments_inside_entry(entry: SubtitleEntry, segments: Iterable[SpeakerSegme
     return clipped
 
 
+def prepare_entries_for_speaker_reanalysis(entries: list[SubtitleEntry]) -> list[SubtitleEntry]:
+    """Rebuild each CapCut source cue before running diarization again.
+
+    Repeated speaker analysis must not keep splitting already-split pieces.
+    We merge pieces that share source_index back into one timing span while
+    preserving the user's punctuation/capitalization and original word order.
+    """
+    rebuilt: list[SubtitleEntry] = []
+    i = 0
+    while i < len(entries):
+        first = entries[i]
+        group = [first]
+        j = i + 1
+        while (
+            j < len(entries)
+            and first.source_index is not None
+            and entries[j].source_index == first.source_index
+        ):
+            group.append(entries[j])
+            j += 1
+
+        if len(group) == 1:
+            e = group[0]
+            rebuilt.append(
+                e.clone(
+                    text=remove_dialogue_prefixes(e.text),
+                    speaker="",
+                    speaker_confidence=0.0,
+                    review_reason="",
+                )
+            )
+        else:
+            text = " ".join(
+                remove_dialogue_prefixes(e.text).replace("\n", " ").strip()
+                for e in group
+                if e.text.strip()
+            )
+            rebuilt.append(
+                first.clone(
+                    start_ms=min(e.start_ms for e in group),
+                    end_ms=max(e.end_ms for e in group),
+                    text=text,
+                    speaker="",
+                    speaker_confidence=0.0,
+                    review_reason="",
+                )
+            )
+        i = j
+
+    return renumber(rebuilt)
+
+
 def apply_speaker_segments(
     entries: list[SubtitleEntry],
     segments: list[SpeakerSegment],
     split_on_change: bool = True,
 ) -> list[SubtitleEntry]:
     output: list[SubtitleEntry] = []
-    for entry in entries:
-        cleaned_text = remove_dialogue_prefixes(entry.text)
-        entry = entry.clone(
-            text=cleaned_text,
-            speaker="",
-            speaker_confidence=0.0,
-            review_reason="",
-        )
+    for entry in prepare_entries_for_speaker_reanalysis(entries):
         overlaps = _segments_inside_entry(entry, segments)
         if not overlaps:
             output.append(
