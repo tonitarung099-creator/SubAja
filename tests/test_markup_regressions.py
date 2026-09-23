@@ -4,6 +4,7 @@ from app.core.subtitle import SubtitleEntry
 from app.core.verbatim import (
     dialogue_structure,
     formatting_markup,
+    formatting_signature,
     is_verbatim_safe,
     lexical_tokens,
     split_words_preserving,
@@ -62,3 +63,10 @@ def test_two_speaker_dialogue_structure_is_part_of_word_lock():
     assert is_verbatim_safe(src, "- Aku pulang!\n- Kenapa?")
     assert not is_verbatim_safe(src, "Aku pulang! Kenapa?")
     assert not is_verbatim_safe(src, "Aku pulang!\n- Kenapa?")
+
+
+def test_word_lock_rejects_moved_italic_scope():
+    src = "<i>Aku</i> pulang."
+    moved = "<i>Aku pulang.</i>"
+    assert formatting_signature(src) != formatting_signature(moved)
+    assert not is_verbatim_safe(src, moved)
