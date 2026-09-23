@@ -93,6 +93,8 @@ def parse_srt(text: str) -> list[SubtitleEntry]:
             )
 
         raw = "\n".join(lines[2:]).strip("\n")
+        if not raw.strip():
+            raise ValueError(f"Blok SRT #{block_number} tidak memiliki teks subtitle.")
         entries.append(
             SubtitleEntry(
                 index=idx,
@@ -137,4 +139,15 @@ def dump_srt(entries: Iterable[SubtitleEntry], include_speaker: bool = False) ->
 
 
 def save_srt(path: str | Path, entries: Iterable[SubtitleEntry], include_speaker: bool = False) -> None:
-    Path(path).write_text(dump_srt(entries, include_speaker=include_speaker), encoding="utf-8-sig")
+    p = Path(path)
+    content = dump_srt(entries, include_speaker=include_speaker)
+    tmp = p.with_name(p.name + ".tmp")
+    try:
+        tmp.write_text(content, encoding="utf-8-sig")
+        tmp.replace(p)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except Exception:
+                pass
