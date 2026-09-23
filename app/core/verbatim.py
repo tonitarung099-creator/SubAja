@@ -10,7 +10,7 @@ _WORD_RE = re.compile(r"[\wÀ-ÖØ-öø-ÿ]+(?:['’\-][\wÀ-ÖØ-öø-ÿ]+)*", 
 _SPACE_BEFORE_PUNCT = re.compile(r"\s+([,.;:!?])")
 _SPACE_AFTER_PUNCT = re.compile(r"([,.;:!?])(?!\s|$)")
 _MULTI_SPACE = re.compile(r"[ \t]+")
-_MARKUP_RE = re.compile(r"(<[^>\r\n]+>|\{\\\\[^}\r\n]*\})")
+_MARKUP_RE = re.compile(r"(<[^>\r\n]+>|\{\\[^}\r\n]*\})")
 
 
 def formatting_markup(text: str) -> list[str]:
@@ -123,7 +123,7 @@ def split_words_preserving(text: str) -> list[str]:
     # Dialogue cue bergaya film memakai "- " di awal baris. Tanda itu hanya
     # formatting, bukan kata sumber, jadi jangan ikut dibagi saat diarization
     # dijalankan ulang.
-    without_dialogue_prefix = re.sub(r"(?m)^\\s*-\\s+", "", text)
+    without_dialogue_prefix = re.sub(r"(?m)^\s*-\s+", "", text)
     return without_dialogue_prefix.replace("\n", " ").split()
 
 
