@@ -30,7 +30,14 @@ def extract_mono_wav(video_path: str | Path, output_path: str | Path | None = No
         "-i", str(video), "-vn", "-ac", "1", "-ar", "16000",
         "-c:a", "pcm_s16le", str(output),
     ]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if proc.returncode != 0:
-        raise RuntimeError(f"Gagal mengekstrak audio: {proc.stderr.strip()}")
-    return output
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(f"Gagal mengekstrak audio: {proc.stderr.strip()}")
+        return output
+    except Exception:
+        try:
+            output.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
