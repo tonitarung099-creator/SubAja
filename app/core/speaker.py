@@ -125,7 +125,13 @@ def apply_speaker_segments(
     for entry in entries:
         overlaps = _segments_inside_entry(entry, segments)
         if not overlaps:
-            output.append(entry)
+            output.append(
+                entry.clone(
+                    speaker="",
+                    speaker_confidence=0.0,
+                    review_reason="Tidak ada speaker yang terdeteksi pada rentang caption ini.",
+                )
+            )
             continue
 
         speaker_durations: dict[str, int] = {}
