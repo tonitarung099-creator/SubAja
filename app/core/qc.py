@@ -5,7 +5,7 @@ from typing import Iterable
 
 from .style import REFERENCE_FILM_STYLE
 from .subtitle import SubtitleEntry
-from .verbatim import is_verbatim_safe
+from .verbatim import is_verbatim_safe, visible_length, visible_text
 
 
 @dataclass(slots=True)
@@ -67,6 +67,7 @@ def audit_entry(
 
     duration = entry.duration_ms
     flat = " ".join(entry.text.replace("\n", " ").split())
+    visible_flat = " ".join(visible_text(entry.text).replace("\n", " ").split())
     lines = [x for x in entry.text.splitlines() if x.strip()] or [flat]
 
     if duration < 500:
@@ -77,7 +78,7 @@ def audit_entry(
         messages.append("Durasi subtitle sangat panjang (>8 dtk).")
 
     if duration > 0:
-        visible_chars = len(flat.replace(" ", ""))
+        visible_chars = len(visible_flat.replace(" ", ""))
         cps = visible_chars / (duration / 1000.0)
         if cps > max_cps:
             review.append("CPS")
@@ -86,7 +87,7 @@ def audit_entry(
     if len(lines) > 2:
         review.append("BARIS")
         messages.append("Lebih dari 2 baris.")
-    if any(len(line) > max_chars_per_line for line in lines):
+    if any(visible_length(line) > max_chars_per_line for line in lines):
         review.append("PANJANG")
         messages.append(f"Ada baris lebih dari {max_chars_per_line} karakter.")
 
