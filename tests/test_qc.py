@@ -32,3 +32,29 @@ def test_qc_marks_estimated_speaker_boundary_for_review():
     result = audit_entries([e])[0]
     assert result.level == "review"
     assert "SPEAKER" in result.codes
+
+
+def test_source_two_speaker_dialogue_is_not_false_positive_word_change():
+    original = "- Aku pulang.\n- Kenapa?"
+    entries = [
+        SubtitleEntry(
+            1, 0, 3000, original,
+            original_text=original,
+            source_index=7,
+        )
+    ]
+    assert changed_source_indices(entries) == set()
+    assert source_group_is_safe(entries, 7)
+
+
+def test_source_two_speaker_dialogue_allows_safe_punctuation_edit():
+    original = "- Aku pulang.\n- Kenapa?"
+    entries = [
+        SubtitleEntry(
+            1, 0, 3000, "- Aku pulang!\n- Kenapa?",
+            original_text=original,
+            source_index=7,
+        )
+    ]
+    assert changed_source_indices(entries) == set()
+    assert source_group_is_safe(entries, 7)
