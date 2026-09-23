@@ -52,7 +52,9 @@ jobs:
 
           cp -a /tmp/subaja/base/SubAja/. .
           cp -a /tmp/subaja/patch/SubAja/. .
-          rm -f .github/workflows/bootstrap-subaja.yml
+
+          # Workflow build ditambahkan setelah source berhasil dicopy melalui GitHub connector.
+          rm -f .github/workflows/build-windows.yml
 
       - name: Commit copied project
         shell: bash
