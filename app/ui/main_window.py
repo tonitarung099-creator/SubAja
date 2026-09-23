@@ -342,16 +342,18 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Project", str(exc))
 
-    def _autosave_project(self):
+    def _autosave_project(self) -> bool:
         if not self.project.project_path:
-            return
+            return True
         try:
             self.project.save_session(self.project.project_path)
             self._last_autosave_error = ""
+            return True
         except Exception as exc:
             message = f"Autosave gagal: {exc}"
             self._last_autosave_error = message
             self.statusBar().showMessage(message)
+            return False
 
     @staticmethod
     def _set_path_label(label: QLabel, name: str, full_path: str):
@@ -450,8 +452,8 @@ class MainWindow(QMainWindow):
         if entry.speaker:
             entry.speaker_confidence = 1.0
         self.refresh_table()
-        self._autosave_project()
-        self.statusBar().showMessage("Baris ditandai sudah dicek. QC teknis lain tetap dipertahankan.")
+        if self._autosave_project():
+            self.statusBar().showMessage("Baris ditandai sudah dicek. QC teknis lain tetap dipertahankan.")
 
     def cell_changed(self, row: int, col: int):
         if self._updating_table or not (0 <= row < len(self.project.entries)):
@@ -635,9 +637,10 @@ class MainWindow(QMainWindow):
             result, count = value
             self.project.entries = result
             self.refresh_table()
-            self._autosave_project()
+            autosaved = self._autosave_project()
             self.progress.setValue(100)
-            self.statusBar().showMessage(f"Speaker selesai. Terdeteksi sekitar {count} speaker.")
+            if autosaved:
+                self.statusBar().showMessage(f"Speaker selesai. Terdeteksi sekitar {count} speaker.")
 
         self._run_worker(task, done, "Menganalisis pergantian speaker secara lokal...")
 
@@ -647,10 +650,10 @@ class MainWindow(QMainWindow):
         self.project.entries = tidy_entries(self.project.entries)
         self.project.entries = apply_reference_film_style(self.project.entries)
         self.refresh_table()
-        self._autosave_project()
-        self.statusBar().showMessage(
-            "Gaya film diterapkan: maks. 2 baris, 42 karakter/baris, dialog dua speaker memakai tanda -."
-        )
+        if self._autosave_project():
+            self.statusBar().showMessage(
+                "Gaya film diterapkan: maks. 2 baris, 42 karakter/baris, dialog dua speaker memakai tanda -."
+            )
 
     def open_api_manager(self):
         dlg = ApiManagerDialog(self.vault, self)
@@ -676,13 +679,14 @@ class MainWindow(QMainWindow):
             result, stats = value
             self.project.entries = result
             self.refresh_table()
-            self._autosave_project()
+            autosaved = self._autosave_project()
             self.progress.setValue(100)
-            self.statusBar().showMessage(
-                f"Gemini hemat selesai. Dikirim {stats.processed}, dilewati {stats.skipped_clean}, "
-                f"cache {stats.cached}, ditolak Word Lock {stats.rejected_word_changes}, "
-                f"respons hilang {stats.missing_results}."
-            )
+            if autosaved:
+                self.statusBar().showMessage(
+                    f"Gemini hemat selesai. Dikirim {stats.processed}, dilewati {stats.skipped_clean}, "
+                    f"cache {stats.cached}, ditolak Word Lock {stats.rejected_word_changes}, "
+                    f"respons hilang {stats.missing_results}."
+                )
 
         self._run_worker(task, done, "Gemini hemat: hanya caption yang masih perlu tanda baca...")
 
