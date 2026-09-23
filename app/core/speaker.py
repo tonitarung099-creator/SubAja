@@ -184,6 +184,22 @@ def prepare_entries_for_speaker_reanalysis(entries: list[SubtitleEntry]) -> list
     return renumber(rebuilt)
 
 
+def _covered_duration_ms(overlaps: list[tuple[int, str, int]]) -> int:
+    intervals = sorted((start, end) for start, _, end in overlaps if end > start)
+    if not intervals:
+        return 0
+    total = 0
+    cur_start, cur_end = intervals[0]
+    for start, end in intervals[1:]:
+        if start <= cur_end:
+            cur_end = max(cur_end, end)
+        else:
+            total += cur_end - cur_start
+            cur_start, cur_end = start, end
+    total += cur_end - cur_start
+    return total
+
+
 def apply_speaker_segments(
     entries: list[SubtitleEntry],
     segments: list[SpeakerSegment],
@@ -206,7 +222,12 @@ def apply_speaker_segments(
         for start, speaker, end in overlaps:
             speaker_durations[speaker] = speaker_durations.get(speaker, 0) + (end - start)
         dominant = max(speaker_durations, key=speaker_durations.get)
-        confidence = speaker_durations[dominant] / max(1, sum(speaker_durations.values()))
+        dominance = speaker_durations[dominant] / max(1, sum(speaker_durations.values()))
+        coverage = min(
+            1.0,
+            _covered_duration_ms(overlaps) / max(1, entry.duration_ms),
+        )
+        confidence = dominance * coverage
 
         distinct = {x[1] for x in overlaps}
         has_speaker_overlap = any(
@@ -234,7 +255,12 @@ def apply_speaker_segments(
             )
         else:
             reason = ""
-            if len(distinct) > 1:
+            if len(distinct) == 1 and coverage < 0.50:
+                reason = (
+                    f"Speaker hanya terdeteksi pada sekitar {coverage:.0%} durasi caption; "
+                    "identitas speaker perlu dicek."
+                )
+            elif len(distinct) > 1:
                 if has_speaker_overlap:
                     reason = (
                         "Dua atau lebih speaker terdengar tumpang tindih pada caption ini. "
