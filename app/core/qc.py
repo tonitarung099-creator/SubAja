@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from .style import REFERENCE_FILM_STYLE
 from .subtitle import SubtitleEntry
 from .verbatim import is_verbatim_safe
 
@@ -53,8 +54,8 @@ def audit_entry(
     next_entry: SubtitleEntry | None = None,
     source_changed: bool = False,
     speaker_analysis_present: bool = False,
-    max_chars_per_line: int = 42,
-    max_cps: float = 20.0,
+    max_chars_per_line: int = REFERENCE_FILM_STYLE.max_chars_per_line,
+    max_cps: float = REFERENCE_FILM_STYLE.max_cps,
 ) -> QCResult:
     critical: list[str] = []
     review: list[str] = []
