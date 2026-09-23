@@ -23,6 +23,23 @@ class GeminiStats:
     processed: int = 0
     cached: int = 0
     rejected_word_changes: int = 0
+    skipped_clean: int = 0
+
+
+def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
+    """Hemat Free Tier: kirim hanya caption yang masih tampak perlu bantuan AI."""
+    flat = " ".join(entry.text.replace("\n", " ").split()).strip()
+    if not flat:
+        return False
+    if entry.review_reason:
+        return True
+
+    first_alpha = next((ch for ch in flat if ch.isalpha()), "")
+    starts_clean = not first_alpha or first_alpha.isupper()
+    ends_clean = flat.endswith((".", "?", "!", "…", '."', '?"', '!"', ".”", "?”", "!”"))
+    spacing_clean = "  " not in entry.text and " ," not in entry.text and " ." not in entry.text
+
+    return not (starts_clean and ends_clean and spacing_clean)
 
 
 def _extract_json(text: str):
@@ -104,6 +121,9 @@ class GeminiPunctuator:
 
         for pos, e in enumerate(out):
             positions[e.index] = pos
+            if not needs_gemini_punctuation(e):
+                stats.skipped_clean += 1
+                continue
             cached = self.cache.get(self.model, e.text)
             if cached is not None and is_verbatim_safe(e.text, cached):
                 out[pos] = e.clone(text=cached)
@@ -112,6 +132,10 @@ class GeminiPunctuator:
                 missing.append(e)
 
         total = max(1, len(missing))
+        if not missing:
+            if progress:
+                progress(100, f"Gemini hemat: 0 dikirim, {stats.skipped_clean} sudah rapi")
+            return renumber(out), stats
         done = 0
         for offset in range(0, len(missing), batch_size):
             batch = missing[offset : offset + batch_size]
