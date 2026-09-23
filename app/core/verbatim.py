@@ -10,10 +10,32 @@ _WORD_RE = re.compile(r"[\wÀ-ÖØ-öø-ÿ]+(?:['’\-][\wÀ-ÖØ-öø-ÿ]+)*", 
 _SPACE_BEFORE_PUNCT = re.compile(r"\s+([,.;:!?])")
 _SPACE_AFTER_PUNCT = re.compile(r"([,.;:!?])(?!\s|$)")
 _MULTI_SPACE = re.compile(r"[ \t]+")
+_MARKUP_RE = re.compile(r"(<[^>\r\n]+>|\{\\\\[^}\r\n]*\})")
+
+
+def formatting_markup(text: str) -> list[str]:
+    """Return formatting tags/overrides in source order.
+
+    SRT HTML tags such as <i> and ASS-style {\\...} overrides are formatting,
+    not spoken words, but SubAja preserves them exactly so styling is not lost.
+    """
+    return [m.group(0) for m in _MARKUP_RE.finditer(text)]
+
+
+def visible_text(text: str) -> str:
+    return _MARKUP_RE.sub("", text)
+
+
+def visible_length(text: str) -> int:
+    return len(visible_text(text))
+
+
+def has_formatting_markup(text: str) -> bool:
+    return _MARKUP_RE.search(text) is not None
 
 
 def lexical_tokens(text: str) -> list[str]:
-    return [m.group(0).casefold() for m in _WORD_RE.finditer(text)]
+    return [m.group(0).casefold() for m in _WORD_RE.finditer(visible_text(text))]
 
 
 def is_verbatim_safe(original: str, candidate: str) -> bool:
@@ -21,7 +43,10 @@ def is_verbatim_safe(original: str, candidate: str) -> bool:
 
     Case, punctuation, whitespace, and line breaks may change. Words may not.
     """
-    return lexical_tokens(original) == lexical_tokens(candidate)
+    return (
+        lexical_tokens(original) == lexical_tokens(candidate)
+        and formatting_markup(original) == formatting_markup(candidate)
+    )
 
 
 def clean_spacing(text: str) -> str:
@@ -35,12 +60,18 @@ def clean_spacing(text: str) -> str:
 
 
 def capitalize_first(text: str) -> str:
-    chars = list(text)
-    for i, ch in enumerate(chars):
-        if ch.isalpha():
-            chars[i] = ch.upper()
-            break
-    return "".join(chars)
+    # Never capitalize letters inside formatting tags such as <i>.
+    parts = _MARKUP_RE.split(text)
+    for part_index, part in enumerate(parts):
+        if not part or _MARKUP_RE.fullmatch(part):
+            continue
+        chars = list(part)
+        for i, ch in enumerate(chars):
+            if ch.isalpha():
+                chars[i] = ch.upper()
+                parts[part_index] = "".join(chars)
+                return "".join(parts)
+    return text
 
 
 def ensure_terminal_punctuation(text: str) -> str:
@@ -55,7 +86,7 @@ def ensure_terminal_punctuation(text: str) -> str:
 def wrap_two_lines(text: str, max_chars: int = 42) -> str:
     """Wrap to at most two visually balanced lines without changing words."""
     flat = " ".join(text.replace("\n", " ").split())
-    if len(flat) <= max_chars:
+    if visible_length(flat) <= max_chars:
         return flat
     words = flat.split(" ")
     if len(words) <= 1:
@@ -64,8 +95,10 @@ def wrap_two_lines(text: str, max_chars: int = 42) -> str:
     for cut in range(1, len(words)):
         left = " ".join(words[:cut])
         right = " ".join(words[cut:])
-        overflow = max(0, len(left) - max_chars) + max(0, len(right) - max_chars)
-        balance = abs(len(left) - len(right))
+        left_len = visible_length(left)
+        right_len = visible_length(right)
+        overflow = max(0, left_len - max_chars) + max(0, right_len - max_chars)
+        balance = abs(left_len - right_len)
         score = overflow * 1000 + balance
         if best is None or score < best[0]:
             best = (score, left, right)
