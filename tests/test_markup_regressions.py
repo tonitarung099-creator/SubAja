@@ -2,6 +2,7 @@ from app.core.gemini import needs_gemini_punctuation
 from app.core.speaker import SpeakerSegment, apply_speaker_segments
 from app.core.subtitle import SubtitleEntry
 from app.core.verbatim import (
+    dialogue_structure,
     formatting_markup,
     is_verbatim_safe,
     lexical_tokens,
@@ -53,3 +54,11 @@ def test_formatted_caption_with_multiple_speakers_is_not_auto_split():
     assert len(out) == 1
     assert out[0].text == entry.text
     assert "tag format" in out[0].review_reason
+
+
+def test_two_speaker_dialogue_structure_is_part_of_word_lock():
+    src = "- Aku pulang.\n- Kenapa?"
+    assert dialogue_structure(src) == (0, 1)
+    assert is_verbatim_safe(src, "- Aku pulang!\n- Kenapa?")
+    assert not is_verbatim_safe(src, "Aku pulang! Kenapa?")
+    assert not is_verbatim_safe(src, "Aku pulang!\n- Kenapa?")
