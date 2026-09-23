@@ -71,3 +71,40 @@ def test_repeated_speaker_analysis_does_not_keep_splitting_previous_pieces():
     )
     assert second[0].start_ms == 0
     assert second[-1].end_ms == 4000
+
+
+def test_source_dialogue_markers_are_preserved_during_analysis():
+    original = "- Aku pulang.\n- Kenapa?"
+    entry = SubtitleEntry(
+        1,
+        0,
+        3000,
+        original,
+        original_text=original,
+        source_index=1,
+    )
+    segments = [
+        SpeakerSegment(0, 1500, "Speaker 1"),
+        SpeakerSegment(1500, 3000, "Speaker 2"),
+    ]
+    out = apply_speaker_segments([entry], segments, split_on_change=True)
+    assert len(out) == 1
+    assert out[0].text == original
+    assert "struktur dua pembicara" in out[0].review_reason
+
+
+def test_legacy_split_of_source_dialogue_is_recovered_before_reanalysis():
+    original = "- Aku pulang.\n- Kenapa?"
+    legacy = [
+        SubtitleEntry(
+            1, 0, 1500, "Aku pulang.", speaker="Speaker 1",
+            original_text=original, source_index=1,
+        ),
+        SubtitleEntry(
+            2, 1500, 3000, "Kenapa?", speaker="Speaker 2",
+            original_text=original, source_index=1,
+        ),
+    ]
+    out = apply_speaker_segments(legacy, [], split_on_change=True)
+    assert len(out) == 1
+    assert out[0].text == original
