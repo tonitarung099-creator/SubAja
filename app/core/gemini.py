@@ -39,7 +39,30 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
     ends_clean = flat.endswith((".", "?", "!", "…", '."', '?"', '!"', ".”", "?”", "!”"))
     spacing_clean = "  " not in entry.text and " ," not in entry.text and " ." not in entry.text
 
+    # Kalimat tanya bahasa Indonesia sering ditranskrip CapCut sebagai titik biasa.
+    # Tandai untuk Gemini hanya bila ada sinyal tanya yang cukup kuat.
+    lower = flat.casefold()
+    question_starters = (
+        "apa ", "apakah ", "siapa ", "kapan ", "kenapa ", "mengapa ",
+        "bagaimana ", "berapa ", "mana ", "di mana ", "dimana ",
+        "ke mana ", "kemana ", "dari mana ", "darimana ",
+    )
+    question_particles = (" nggak?", " tidak?", " kan?", " ya?")
+    looks_like_question = (
+        lower.startswith(question_starters)
+        or any(token in lower for token in (" kenapa ", " bagaimana ", " berapa ", " siapa ", " kapan "))
+        or lower.endswith(question_particles)
+    )
+    if looks_like_question and not flat.endswith(("?", '?"', "?”")):
+        return True
+
     return not (starts_clean and ends_clean and spacing_clean)
+
+
+def estimate_gemini_work(entries: list[SubtitleEntry], batch_size: int = 60) -> tuple[int, int]:
+    selected = sum(1 for e in entries if needs_gemini_punctuation(e))
+    requests = (selected + max(1, batch_size) - 1) // max(1, batch_size)
+    return selected, requests
 
 
 def _extract_json(text: str):
