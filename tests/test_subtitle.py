@@ -35,3 +35,42 @@ aman lagi
         assert "Blok SRT #2" in str(exc)
     else:
         raise AssertionError("Malformed SRT block harus ditolak.")
+
+
+def test_invalid_timestamp_range_is_rejected():
+    try:
+        timestamp_to_ms("00:61:00,000")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Menit >59 harus ditolak.")
+
+
+def test_duplicate_srt_index_is_rejected():
+    src = """1
+00:00:01,000 --> 00:00:02,000
+satu
+
+1
+00:00:02,100 --> 00:00:03,000
+dua
+"""
+    try:
+        parse_srt(src)
+    except ValueError as exc:
+        assert "duplikat" in str(exc)
+    else:
+        raise AssertionError("Nomor cue duplikat harus ditolak.")
+
+
+def test_non_positive_srt_duration_is_rejected():
+    src = """1
+00:00:03,000 --> 00:00:03,000
+diam
+"""
+    try:
+        parse_srt(src)
+    except ValueError as exc:
+        assert "durasi tidak valid" in str(exc)
+    else:
+        raise AssertionError("Durasi nol harus ditolak.")
