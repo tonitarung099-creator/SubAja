@@ -14,3 +14,18 @@ def test_apply_speaker_segments_preserves_words():
     assert out[0].speaker == "Speaker 1"
     assert out[1].speaker == "Speaker 2"
     assert lexical_tokens(entries[0].text) == lexical_tokens(" ".join(x.text for x in out))
+
+
+def test_overlapping_speakers_are_not_auto_split():
+    entry = SubtitleEntry(
+        1, 0, 4000, "aku pulang kamu tunggu di sini",
+        original_text="aku pulang kamu tunggu di sini",
+        source_index=1,
+    )
+    segments = [
+        SpeakerSegment(0, 2400, "Speaker 1"),
+        SpeakerSegment(1800, 4000, "Speaker 2"),
+    ]
+    out = apply_speaker_segments([entry], segments, split_on_change=True)
+    assert len(out) == 1
+    assert "tumpang tindih" in out[0].review_reason
