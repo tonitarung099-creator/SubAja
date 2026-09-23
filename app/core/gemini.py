@@ -1,0 +1,132 @@
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from typing import Callable
+
+from .cache import GeminiCache
+from .subtitle import SubtitleEntry, renumber
+from .verbatim import is_verbatim_safe, wrap_two_lines
+
+
+class GeminiError(RuntimeError):
+    pass
+
+
+class GeminiQuotaError(GeminiError):
+    pass
+
+
+@dataclass(slots=True)
+class GeminiStats:
+    processed: int = 0
+    cached: int = 0
+    rejected_word_changes: int = 0
+
+
+def _extract_json(text: str):
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    start = text.find("[")
+    end = text.rfind("]")
+    if start >= 0 and end > start:
+        text = text[start : end + 1]
+    return json.loads(text)
+
+
+class GeminiPunctuator:
+    def __init__(self, api_key: str, model: str = "gemini-3.8-flash"):
+        if not api_key.strip():
+            raise GeminiError("API key Gemini belum dipilih.")
+        self.api_key = api_key.strip()
+        self.model = model.strip() or "gemini-3.8-flash"
+        self.cache = GeminiCache()
+
+    def _client(self):
+        try:
+            from google import genai
+        except ImportError as exc:
+            raise GeminiError("Paket google-genai tidak tersedia.") from exc
+        return genai.Client(api_key=self.api_key)
+
+    def test(self) -> str:
+        try:
+            response = self._client().models.generate_content(
+                model=self.model,
+                contents="Balas hanya dengan kata OK.",
+            )
+            return (response.text or "").strip()
+        except Exception as exc:
+            msg = str(exc)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg.upper():
+                raise GeminiQuotaError("Kuota/rate limit Gemini tercapai.") from exc
+            raise GeminiError(msg) from exc
+
+    def _call_batch(self, entries: list[SubtitleEntry]) -> dict[int, str]:
+        payload = [{"id": e.index, "speaker": e.speaker or None, "text": e.text.replace("\n", " ")} for e in entries]
+        prompt = (
+            "Anda adalah editor tanda baca subtitle film Indonesia.\n"
+            "ATURAN MUTLAK:\n"
+            "1. JANGAN menambah, menghapus, mengganti, meringkas, menerjemahkan, atau mengubah urutan SATU KATA PUN.\n"
+            "2. Yang boleh diubah HANYA huruf besar/kecil, tanda baca, spasi, dan pemisahan baris.\n"
+            "3. Pertahankan kata informal persis seperti sumber: nggak tetap nggak, udah tetap udah, dll.\n"
+            "4. Gunakan pergantian speaker hanya sebagai konteks untuk menentukan tanda baca; jangan menulis label speaker ke teks.\n"
+            "5. Jangan menggabungkan, menghapus, atau memecah ID subtitle.\n"
+            "6. Kembalikan JSON array saja dengan bentuk [{\"id\":1,\"text\":\"...\"}].\n"
+            "7. Maksimal dua baris per subtitle.\n\n"
+            "SUBTITLE:\n" + json.dumps(payload, ensure_ascii=False)
+        )
+        try:
+            response = self._client().models.generate_content(model=self.model, contents=prompt)
+            data = _extract_json(response.text or "")
+            return {int(x["id"]): str(x["text"]) for x in data if "id" in x and "text" in x}
+        except Exception as exc:
+            msg = str(exc)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg.upper():
+                raise GeminiQuotaError(
+                    "Kuota/rate limit Gemini tercapai. Proses dihentikan aman; hasil yang sudah selesai tersimpan di cache."
+                ) from exc
+            raise GeminiError(msg) from exc
+
+    def process(
+        self,
+        entries: list[SubtitleEntry],
+        batch_size: int = 30,
+        progress: Callable[[int, str], None] | None = None,
+    ) -> tuple[list[SubtitleEntry], GeminiStats]:
+        out = [e.clone() for e in entries]
+        stats = GeminiStats()
+        missing: list[SubtitleEntry] = []
+        positions: dict[int, int] = {}
+
+        for pos, e in enumerate(out):
+            positions[e.index] = pos
+            cached = self.cache.get(self.model, e.text)
+            if cached is not None and is_verbatim_safe(e.text, cached):
+                out[pos] = e.clone(text=cached)
+                stats.cached += 1
+            else:
+                missing.append(e)
+
+        total = max(1, len(missing))
+        done = 0
+        for offset in range(0, len(missing), batch_size):
+            batch = missing[offset : offset + batch_size]
+            results = self._call_batch(batch)
+            for e in batch:
+                candidate = results.get(e.index, e.text)
+                # Absolute word lock. Gemini output is discarded if one lexical token changes.
+                if is_verbatim_safe(e.text, candidate):
+                    candidate = wrap_two_lines(candidate, max_chars=42)
+                    out[positions[e.index]] = e.clone(text=candidate)
+                    self.cache.put(self.model, e.text, candidate)
+                else:
+                    stats.rejected_word_changes += 1
+                stats.processed += 1
+                done += 1
+            if progress:
+                progress(int(done * 100 / total), f"Gemini: {done}/{len(missing)}")
+        return renumber(out), stats

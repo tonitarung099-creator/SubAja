@@ -1,0 +1,11 @@
+1
+00:00:01,000 --> 00:00:03,000
+aku udah bilang jangan ke sana
+
+2
+00:00:03,100 --> 00:00:04,800
+kenapa kamu masih pergi
+
+3
+00:00:05,000 --> 00:00:06,800
+aku harus pergi
