@@ -113,13 +113,14 @@ class GeminiPunctuator:
         return genai.Client(api_key=self.api_key)
 
     @staticmethod
-    def _low_thinking_config():
+    def _low_thinking_config(*, json_response: bool = False):
         try:
             from google.genai import types
         except ImportError as exc:
             raise GeminiError("Paket google-genai tidak tersedia.") from exc
         return types.GenerateContentConfig(
-            thinking_config=types.ThinkingConfig(thinking_level="low")
+            thinking_config=types.ThinkingConfig(thinking_level="low"),
+            response_mime_type="application/json" if json_response else None,
         )
 
     def test(self) -> str:
@@ -156,7 +157,7 @@ class GeminiPunctuator:
             response = self._client().models.generate_content(
                 model=self.model,
                 contents=prompt,
-                config=self._low_thinking_config(),
+                config=self._low_thinking_config(json_response=True),
             )
             data = _extract_json(response.text or "")
             return {int(x["id"]): str(x["text"]) for x in data if "id" in x and "text" in x}
