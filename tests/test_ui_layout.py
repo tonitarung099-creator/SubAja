@@ -171,3 +171,58 @@ def test_autosave_failure_remains_visible_in_status_bar(tmp_path, monkeypatch):
 
     win.close()
     app.processEvents()
+
+
+def test_relink_video_autosaves_project_path(tmp_path, monkeypatch):
+    app = _app()
+    win = MainWindow()
+
+    session = tmp_path / "film.subaja.json"
+    win.project.project_path = session
+    win.project.entries = [
+        SubtitleEntry(1, 0, 1000, "A", original_text="A", source_index=1)
+    ]
+    new_video = tmp_path / "relink.mp4"
+    new_video.write_bytes(b"video")
+
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        staticmethod(lambda *args, **kwargs: (str(new_video), "Video (*.mp4)")),
+    )
+
+    win.load_video()
+    app.processEvents()
+
+    assert win.project.video_path == new_video
+    assert session.exists()
+    assert str(new_video) in session.read_text(encoding="utf-8")
+
+    win.close()
+    app.processEvents()
+
+
+def test_missing_video_blocks_speaker_analysis_before_worker(tmp_path, monkeypatch):
+    app = _app()
+    win = MainWindow()
+    win.project.video_path = tmp_path / "hilang.mp4"
+    win.project.entries = [
+        SubtitleEntry(1, 0, 1000, "A", original_text="A", source_index=1)
+    ]
+
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *args, **kwargs: warnings.append(args[2] if len(args) > 2 else "")),
+    )
+
+    win.analyze_speakers()
+    app.processEvents()
+
+    assert warnings
+    assert "tidak ditemukan" in warnings[-1]
+    assert win._thread is None
+
+    win.close()
+    app.processEvents()
