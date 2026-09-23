@@ -248,7 +248,7 @@ def apply_speaker_segments(
             pieces = split_entry_by_boundaries(entry, overlaps)
             output.extend(
                 p.clone(
-                    speaker_confidence=0.75,
+                    speaker_confidence=min(0.75, coverage),
                     review_reason="Pergantian speaker terjadi di dalam satu caption CapCut; batas kata diperkirakan dari durasi suara.",
                 )
                 for p in pieces
