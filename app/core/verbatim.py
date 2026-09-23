@@ -87,7 +87,11 @@ def tidy_local(text: str, add_terminal_punctuation: bool = False, max_chars: int
 
 
 def split_words_preserving(text: str) -> list[str]:
-    return text.replace("\n", " ").split()
+    # Dialogue cue bergaya film memakai "- " di awal baris. Tanda itu hanya
+    # formatting, bukan kata sumber, jadi jangan ikut dibagi saat diarization
+    # dijalankan ulang.
+    without_dialogue_prefix = re.sub(r"(?m)^\\s*-\\s+", "", text)
+    return without_dialogue_prefix.replace("\n", " ").split()
 
 
 def split_entry_by_boundaries(
