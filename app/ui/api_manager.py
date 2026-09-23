@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from PySide6.QtCore import Qt, QThread, Signal, QObject
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
@@ -32,6 +34,8 @@ class ApiManagerDialog(QDialog):
         self.setWindowTitle("Gemini API Manager - 100 Slot")
         self.resize(760, 620)
         self.vault = vault
+        self._snapshot = copy.deepcopy(vault.data)
+        self._saved = False
         self.thread = None
         self.worker = None
 
@@ -105,7 +109,13 @@ class ApiManagerDialog(QDialog):
     def save_and_accept(self):
         self._sync()
         self.vault.save()
+        self._saved = True
+        self._snapshot = copy.deepcopy(self.vault.data)
         self.accept()
+
+    def _restore_snapshot(self):
+        if not self._saved:
+            self.vault.data = copy.deepcopy(self._snapshot)
 
     def _test_running(self) -> bool:
         if self.thread is None:
@@ -121,6 +131,7 @@ class ApiManagerDialog(QDialog):
         if self._test_running():
             QMessageBox.information(self, "Gemini", "Tunggu test API key selesai sebelum menutup jendela ini.")
             return
+        self._restore_snapshot()
         super().reject()
 
     def closeEvent(self, event):
@@ -128,6 +139,7 @@ class ApiManagerDialog(QDialog):
             QMessageBox.information(self, "Gemini", "Tunggu test API key selesai sebelum menutup jendela ini.")
             event.ignore()
             return
+        self._restore_snapshot()
         super().closeEvent(event)
 
     def test_active(self):
@@ -151,18 +163,22 @@ class ApiManagerDialog(QDialog):
         worker.done.connect(self._test_done)
         worker.done.connect(thread.quit)
         worker.done.connect(worker.deleteLater)
-        thread.finished.connect(lambda: self._test_thread_finished(thread))
+        thread.finished.connect(self._test_thread_finished)
         thread.start()
 
-    def _test_thread_finished(self, thread: QThread):
+    def _test_thread_finished(self):
+        thread = self.thread
         self.test_btn.setEnabled(True)
         self.save_btn.setEnabled(True)
         self.cancel_btn.setEnabled(True)
         self.test_btn.setText("Test Key Aktif")
-        if self.thread is thread:
-            self.thread = None
-            self.worker = None
-        thread.deleteLater()
+        self.thread = None
+        self.worker = None
+        if thread is not None:
+            try:
+                thread.deleteLater()
+            except RuntimeError:
+                pass
 
     def _test_done(self, ok: bool, message: str):
         if ok:
