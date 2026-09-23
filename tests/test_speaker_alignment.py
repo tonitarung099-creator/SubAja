@@ -123,7 +123,9 @@ def test_same_speaker_nested_segments_keep_farthest_end():
     out = apply_speaker_segments([entry], segments, split_on_change=True)
     assert len(out) == 1
     assert out[0].speaker == "Speaker 1"
-    assert out[0].speaker_confidence == 1.0
+    # Segmen speaker tergabung sampai 3000 ms dari caption 4000 ms,
+    # jadi coverage-aware confidence yang benar adalah 75%.
+    assert out[0].speaker_confidence == 0.75
 
 
 def test_speaker_confidence_is_reduced_when_audio_coverage_is_low():
