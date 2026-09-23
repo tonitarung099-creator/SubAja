@@ -5,7 +5,7 @@ from typing import Iterable
 
 from .style import REFERENCE_FILM_STYLE
 from .subtitle import SubtitleEntry
-from .verbatim import is_verbatim_safe, visible_length, visible_text
+from .verbatim import dialogue_structure, is_verbatim_safe, visible_length, visible_text
 
 
 @dataclass(slots=True)
@@ -19,6 +19,25 @@ class QCResult:
         return {"ok": "OK", "review": "CEK", "critical": "KRITIS"}.get(self.level, self.level.upper())
 
 
+def _reconstruct_source_group(parts: list[SubtitleEntry], original: str) -> str:
+    if not parts:
+        return ""
+    parts = sorted(parts, key=lambda x: (x.start_ms, x.index))
+    if len(parts) == 1:
+        return parts[0].text.strip()
+
+    # Untuk source dialogue "- ...\n- ..." jangan ratakan newline karena
+    # struktur dua pembicara memang bagian dari Word Lock.
+    if dialogue_structure(original):
+        return "\n".join(p.text.strip() for p in parts if p.text.strip())
+
+    return " ".join(
+        p.text.replace("\n", " ").strip()
+        for p in parts
+        if p.text.strip()
+    )
+
+
 def changed_source_indices(entries: Iterable[SubtitleEntry]) -> set[int]:
     groups: dict[int, list[SubtitleEntry]] = {}
     for e in entries:
@@ -30,7 +49,7 @@ def changed_source_indices(entries: Iterable[SubtitleEntry]) -> set[int]:
     for source_index, parts in groups.items():
         parts = sorted(parts, key=lambda x: (x.start_ms, x.index))
         original = parts[0].original_text
-        joined = " ".join(p.text.replace("\n", " ").strip() for p in parts if p.text.strip())
+        joined = _reconstruct_source_group(parts, original)
         if original and not is_verbatim_safe(original, joined):
             changed.add(source_index)
     return changed
@@ -44,7 +63,7 @@ def source_group_is_safe(entries: Iterable[SubtitleEntry], source_index: int | N
         return True
     parts.sort(key=lambda x: (x.start_ms, x.index))
     original = parts[0].original_text
-    joined = " ".join(p.text.replace("\n", " ").strip() for p in parts if p.text.strip())
+    joined = _reconstruct_source_group(parts, original)
     return not original or is_verbatim_safe(original, joined)
 
 
