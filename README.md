@@ -14,6 +14,23 @@ SubAja memperlakukan kata dari SRT sebagai data terkunci. Aplikasi boleh menguba
 
 Aplikasi **tidak boleh** mengganti `nggak` menjadi `tidak`, `udah` menjadi `sudah`, meringkas kalimat, menerjemahkan, atau mengubah urutan kata. Hasil Gemini divalidasi lagi secara lokal; bila urutan kata berubah, hasil AI otomatis ditolak.
 
+## Gaya output default
+
+SubAja mengikuti pola subtitle film Indonesia dari file referensi yang dipakai saat pengembangan:
+
+- maksimal 2 baris,
+- maksimal 42 karakter per baris,
+- QC memberi tanda jika kecepatan baca melewati 19 karakter/detik,
+- satu pembicara ditulis tanpa label nama,
+- bila satu caption CapCut berisi dua pembicara dan pemisahannya cukup aman, hasil akhir memakai:
+  `- dialog pembicara pertama`
+  `- dialog pembicara kedua`,
+- kata sumber tetap dikunci oleh Word Lock.
+
+## Hemat Gemini Free
+
+Gemini bersifat opsional. Speaker diarization, pemisahan dialog, formatting, QC, preview, dan export berjalan lokal. Mode Gemini Hemat hanya mengirim caption yang masih tampak memerlukan bantuan tanda baca/konteks. Caption yang sudah rapi dilewati dan hasil yang sudah pernah diproses memakai cache.
+
 ## Fitur MVP
 
 - Import video film (`mp4`, `mkv`, `mov`, dll.).
