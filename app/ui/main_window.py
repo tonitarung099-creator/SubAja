@@ -70,6 +70,12 @@ class MainWindow(QMainWindow):
         open_srt = QAction("Buka SRT CapCut", self)
         open_srt.triggered.connect(self.load_srt)
         menu.addAction(open_srt)
+        open_project = QAction("Buka Project SubAja", self)
+        open_project.triggered.connect(self.load_project)
+        menu.addAction(open_project)
+        save_project = QAction("Simpan Project SubAja", self)
+        save_project.triggered.connect(self.save_project)
+        menu.addAction(save_project)
         menu.addSeparator()
         export_action = QAction("Export SRT", self)
         export_action.triggered.connect(self.export_srt)
@@ -233,6 +239,53 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "SRT", str(exc))
 
+    def save_project(self):
+        if not self.project.entries:
+            QMessageBox.warning(self, "Project", "Belum ada subtitle untuk disimpan.")
+            return
+        default_name = "project.subaja.json"
+        if self.project.srt_path:
+            default_name = self.project.srt_path.with_suffix(".subaja.json").name
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Simpan Project SubAja", default_name, "SubAja Project (*.subaja.json)"
+        )
+        if not path:
+            return
+        try:
+            self.project.save_session(path)
+            self.statusBar().showMessage(f"Project tersimpan: {path}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Project", str(exc))
+
+    def load_project(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Buka Project SubAja", "", "SubAja Project (*.subaja.json);;JSON (*.json)"
+        )
+        if not path:
+            return
+        try:
+            self.project.load_session(path)
+            if self.project.video_path:
+                self.video_label.setText(self.project.video_path.name)
+                self.video_label.setToolTip(str(self.project.video_path))
+                if self.project.video_path.is_file():
+                    self.player.setSource(QUrl.fromLocalFile(str(self.project.video_path)))
+            if self.project.srt_path:
+                self.srt_label.setText(self.project.srt_path.name)
+                self.srt_label.setToolTip(str(self.project.srt_path))
+            self.refresh_table()
+            self.statusBar().showMessage(f"Project dilanjutkan: {Path(path).name}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Project", str(exc))
+
+    def _autosave_project(self):
+        if not self.project.project_path:
+            return
+        try:
+            self.project.save_session(self.project.project_path)
+        except Exception:
+            pass
+
     def refresh_table(self):
         self._qc_results = audit_entries(self.project.entries)
         review_count = sum(1 for q in self._qc_results if q.level != "ok")
@@ -298,6 +351,7 @@ class MainWindow(QMainWindow):
             entry.speaker_confidence = 1.0 if entry.speaker else 0.0
             entry.review_reason = ""
             self.refresh_table()
+            self._autosave_project()
             return
         if col != 4:
             return
@@ -316,6 +370,7 @@ class MainWindow(QMainWindow):
             )
             return
         self.refresh_table()
+        self._autosave_project()
 
     def toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:
@@ -399,6 +454,7 @@ class MainWindow(QMainWindow):
             result, count = value
             self.project.entries = result
             self.refresh_table()
+            self._autosave_project()
             self.progress.setValue(100)
             self.statusBar().showMessage(f"Speaker selesai. Terdeteksi sekitar {count} speaker.")
 
@@ -410,6 +466,7 @@ class MainWindow(QMainWindow):
         self.project.entries = tidy_entries(self.project.entries)
         self.project.entries = apply_reference_film_style(self.project.entries)
         self.refresh_table()
+        self._autosave_project()
         self.statusBar().showMessage(
             "Gaya film diterapkan: maks. 2 baris, 42 karakter/baris, dialog dua speaker memakai tanda -."
         )
@@ -438,6 +495,7 @@ class MainWindow(QMainWindow):
             result, stats = value
             self.project.entries = result
             self.refresh_table()
+            self._autosave_project()
             self.progress.setValue(100)
             self.statusBar().showMessage(
                 f"Gemini hemat selesai. Dikirim {stats.processed}, dilewati {stats.skipped_clean}, "
