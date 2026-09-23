@@ -1,4 +1,6 @@
+import json
 import os
+from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -196,7 +198,8 @@ def test_relink_video_autosaves_project_path(tmp_path, monkeypatch):
 
     assert win.project.video_path == new_video
     assert session.exists()
-    assert str(new_video) in session.read_text(encoding="utf-8")
+    saved = json.loads(session.read_text(encoding="utf-8"))
+    assert Path(saved["video_path"]) == new_video
 
     win.close()
     app.processEvents()
