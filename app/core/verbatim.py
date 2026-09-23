@@ -61,7 +61,7 @@ def is_verbatim_safe(original: str, candidate: str) -> bool:
     """
     return (
         lexical_tokens(original) == lexical_tokens(candidate)
-        and formatting_markup(original) == formatting_markup(candidate)
+        and formatting_signature(original) == formatting_signature(candidate)
         and preserves_dialogue_structure(original, candidate)
     )
 
