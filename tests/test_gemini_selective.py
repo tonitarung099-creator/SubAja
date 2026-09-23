@@ -1,4 +1,4 @@
-from app.core.gemini import needs_gemini_punctuation
+from app.core.gemini import estimate_gemini_work, needs_gemini_punctuation
 from app.core.subtitle import SubtitleEntry
 
 
@@ -21,3 +21,15 @@ def test_gemini_sends_caption_without_terminal_punctuation():
 
 def test_gemini_sends_caption_marked_for_review():
     assert needs_gemini_punctuation(make("Aku mau pulang.", review_reason="Speaker perlu dicek."))
+
+
+def test_gemini_detects_indonesian_question_with_wrong_period():
+    assert needs_gemini_punctuation(make("Kenapa kamu pergi."))
+
+
+def test_gemini_work_estimate_uses_batches():
+    entries = [make("aku mau pulang") for _ in range(61)]
+    # Index duplication tidak memengaruhi estimator karena hanya menghitung kebutuhan.
+    selected, requests = estimate_gemini_work(entries, batch_size=60)
+    assert selected == 61
+    assert requests == 2
