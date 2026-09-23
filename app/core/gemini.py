@@ -7,7 +7,7 @@ from typing import Callable
 
 from .cache import GeminiCache
 from .subtitle import SubtitleEntry, renumber
-from .verbatim import is_verbatim_safe, wrap_two_lines
+from .verbatim import is_verbatim_safe, visible_text, wrap_two_lines
 
 
 class GeminiError(RuntimeError):
@@ -29,19 +29,20 @@ class GeminiStats:
 def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
     """Hemat Free Tier: kirim hanya caption yang masih tampak perlu bantuan AI."""
     flat = " ".join(entry.text.replace("\n", " ").split()).strip()
+    visible = " ".join(visible_text(entry.text).replace("\n", " ").split()).strip()
     if not flat:
         return False
     if entry.review_reason:
         return True
 
-    first_alpha = next((ch for ch in flat if ch.isalpha()), "")
+    first_alpha = next((ch for ch in visible if ch.isalpha()), "")
     starts_clean = not first_alpha or first_alpha.isupper()
     ends_clean = flat.endswith((".", "?", "!", "…", '."', '?"', '!"', ".”", "?”", "!”"))
     spacing_clean = "  " not in entry.text and " ," not in entry.text and " ." not in entry.text
 
     # Kalimat tanya bahasa Indonesia sering ditranskrip CapCut sebagai titik biasa.
     # Tandai untuk Gemini hanya bila ada sinyal tanya yang cukup kuat.
-    lower = flat.casefold()
+    lower = visible.casefold()
     question_starters = (
         "apa ", "apakah ", "siapa ", "kapan ", "kenapa ", "mengapa ",
         "bagaimana ", "berapa ", "mana ", "di mana ", "dimana ",
@@ -116,7 +117,8 @@ class GeminiPunctuator:
             "4. Gunakan pergantian speaker hanya sebagai konteks untuk menentukan tanda baca; jangan menulis label speaker ke teks.\n"
             "5. Jangan menggabungkan, menghapus, atau memecah ID subtitle.\n"
             "6. Kembalikan JSON array saja dengan bentuk [{\"id\":1,\"text\":\"...\"}].\n"
-            "7. Maksimal dua baris per subtitle.\n\n"
+            "7. Maksimal dua baris per subtitle.\n"
+            "8. Pertahankan tag format SRT/ASS seperti <i>...</i>, <b>...</b>, atau {\\...} PERSIS seperti sumber.\n\n"
             "SUBTITLE:\n" + json.dumps(payload, ensure_ascii=False)
         )
         try:
