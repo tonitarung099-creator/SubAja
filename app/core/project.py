@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 
 from .style import apply_reference_film_style
-from .subtitle import SubtitleEntry, load_srt, save_srt
+from .subtitle import SubtitleEntry, load_srt, renumber, save_srt
 
 
 @dataclass
@@ -35,7 +35,17 @@ class SubtitleProject:
             "srt_path": str(self.srt_path) if self.srt_path else "",
             "entries": [asdict(e) for e in self.entries],
         }
-        p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        encoded = json.dumps(payload, ensure_ascii=False, indent=2)
+        tmp = p.with_name(p.name + ".tmp")
+        try:
+            tmp.write_text(encoded, encoding="utf-8")
+            tmp.replace(p)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
         self.project_path = p
 
     def load_session(self, path: str | Path):
@@ -43,7 +53,10 @@ class SubtitleProject:
         payload = json.loads(p.read_text(encoding="utf-8"))
         self.video_path = Path(payload["video_path"]) if payload.get("video_path") else None
         self.srt_path = Path(payload["srt_path"]) if payload.get("srt_path") else None
-        self.entries = [SubtitleEntry(**item) for item in payload.get("entries", [])]
+        raw_entries = payload.get("entries", [])
+        if not isinstance(raw_entries, list):
+            raise ValueError("Project SubAja rusak: entries bukan daftar.")
+        self.entries = renumber(SubtitleEntry(**item) for item in raw_entries)
         self.project_path = p
 
     def export(
