@@ -24,6 +24,22 @@ def _single_line(text: str) -> str:
     return capitalize_first(clean_spacing(" ".join(text.replace("\n", " ").split())))
 
 
+def _format_single_entry(entry: SubtitleEntry, style: FilmSubtitleStyle) -> SubtitleEntry:
+    lines = [line.strip() for line in entry.text.splitlines() if line.strip()]
+    if len(lines) == 2 and all(line.startswith(style.dialogue_prefix) for line in lines):
+        formatted_lines = []
+        for line in lines:
+            body = line[len(style.dialogue_prefix):]
+            formatted_lines.append(style.dialogue_prefix + _single_line(body))
+        candidate = "\n".join(formatted_lines)
+        if (
+            all(len(line) <= style.max_chars_per_line for line in formatted_lines)
+            and is_verbatim_safe(entry.text, candidate)
+        ):
+            return entry.clone(text=candidate)
+    return entry.clone(text=tidy_local(entry.text, max_chars=style.max_chars_per_line))
+
+
 def apply_reference_film_style(
     entries: Iterable[SubtitleEntry],
     style: FilmSubtitleStyle = REFERENCE_FILM_STYLE,
@@ -76,7 +92,7 @@ def apply_reference_film_style(
                             start_ms=min(first.start_ms, second.start_ms),
                             end_ms=max(first.end_ms, second.end_ms),
                             text=combined,
-                            speaker="",
+                            speaker=f"{first.speaker} | {second.speaker}",
                             speaker_confidence=min(first.speaker_confidence, second.speaker_confidence),
                             review_reason="",
                         )
@@ -85,8 +101,7 @@ def apply_reference_film_style(
                     continue
 
         for entry in group:
-            formatted = tidy_local(entry.text, max_chars=style.max_chars_per_line)
-            out.append(entry.clone(text=formatted))
+            out.append(_format_single_entry(entry, style))
         i = j
 
     return renumber(out)
