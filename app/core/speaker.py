@@ -8,7 +8,12 @@ import os
 from .audio import extract_mono_wav
 from .resources import model_paths
 from .subtitle import SubtitleEntry, renumber
-from .verbatim import has_formatting_markup, remove_dialogue_prefixes, split_entry_by_boundaries
+from .verbatim import (
+    dialogue_structure,
+    has_formatting_markup,
+    remove_dialogue_prefixes,
+    split_entry_by_boundaries,
+)
 
 
 @dataclass(slots=True)
@@ -141,18 +146,26 @@ def prepare_entries_for_speaker_reanalysis(entries: list[SubtitleEntry]) -> list
             e = group[0]
             rebuilt.append(
                 e.clone(
-                    text=remove_dialogue_prefixes(e.text),
+                    text=e.text if dialogue_structure(e.original_text) else remove_dialogue_prefixes(e.text),
                     speaker="",
                     speaker_confidence=0.0,
                     review_reason="",
                 )
             )
         else:
-            text = " ".join(
-                remove_dialogue_prefixes(e.text).replace("\n", " ").strip()
-                for e in group
-                if e.text.strip()
-            )
+            source_has_dialogue = any(dialogue_structure(e.original_text) for e in group)
+            if source_has_dialogue:
+                text = "\n".join(
+                    e.text.strip()
+                    for e in group
+                    if e.text.strip()
+                )
+            else:
+                text = " ".join(
+                    remove_dialogue_prefixes(e.text).replace("\n", " ").strip()
+                    for e in group
+                    if e.text.strip()
+                )
             rebuilt.append(
                 first.clone(
                     start_ms=min(e.start_ms for e in group),
@@ -200,6 +213,7 @@ def apply_speaker_segments(
         safe_split = (
             split_on_change
             and not has_formatting_markup(entry.text)
+            and not dialogue_structure(entry.original_text)
             and not has_speaker_overlap
             and len(distinct) > 1
             and len(overlaps) <= 4
@@ -222,6 +236,11 @@ def apply_speaker_segments(
                     reason = (
                         "Dua atau lebih speaker terdengar tumpang tindih pada caption ini. "
                         "Pemisahan otomatis ditahan agar timing dan kata tidak salah."
+                    )
+                elif dialogue_structure(entry.original_text):
+                    reason = (
+                        "Caption sumber sudah memakai struktur dua pembicara dengan tanda -. "
+                        "Pemisahan otomatis ditahan agar struktur asli CapCut tidak berubah."
                     )
                 elif has_formatting_markup(entry.text):
                     reason = (
