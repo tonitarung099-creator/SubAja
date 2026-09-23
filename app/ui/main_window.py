@@ -154,6 +154,9 @@ class MainWindow(QMainWindow):
         next_review = QPushButton("Berikutnya yang Perlu Dicek")
         next_review.clicked.connect(self.next_review_issue)
         review_row.addWidget(next_review)
+        mark_reviewed = QPushButton("Tandai Sudah Dicek")
+        mark_reviewed.clicked.connect(self.mark_selected_reviewed)
+        review_row.addWidget(mark_reviewed)
         self.qc_label = QLabel("QC: belum dianalisis")
         review_row.addWidget(self.qc_label)
         review_row.addStretch(1)
@@ -357,6 +360,20 @@ class MainWindow(QMainWindow):
                     self.player.setPosition(self.project.entries[row].start_ms)
                 return
         self.statusBar().showMessage("QC bersih: tidak ada subtitle yang perlu dicek.")
+
+    def mark_selected_reviewed(self):
+        row = self.table.currentRow()
+        if not (0 <= row < len(self.project.entries)):
+            QMessageBox.information(self, "QC", "Pilih satu baris subtitle terlebih dahulu.")
+            return
+        entry = self.project.entries[row]
+        if entry.review_reason:
+            entry.review_reason = ""
+        if entry.speaker:
+            entry.speaker_confidence = 1.0
+        self.refresh_table()
+        self._autosave_project()
+        self.statusBar().showMessage("Baris ditandai sudah dicek. QC teknis lain tetap dipertahankan.")
 
     def cell_changed(self, row: int, col: int):
         if self._updating_table or not (0 <= row < len(self.project.entries)):
