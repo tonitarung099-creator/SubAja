@@ -255,7 +255,8 @@ class MainWindow(QMainWindow):
             self.project.load_video(path)
             self._set_path_label(self.video_label, Path(path).name, path)
             self.player.setSource(QUrl.fromLocalFile(path))
-            self.statusBar().showMessage("Video dimuat.")
+            if self._autosave_project():
+                self.statusBar().showMessage("Video dimuat.")
         except Exception as exc:
             QMessageBox.critical(self, "Video", str(exc))
 
@@ -620,6 +621,13 @@ class MainWindow(QMainWindow):
     def analyze_speakers(self):
         if not self.project.video_path or not self.project.entries:
             QMessageBox.warning(self, "Speaker", "Masukkan video dan SRT CapCut terlebih dahulu.")
+            return
+        if not self.project.video_path.is_file():
+            QMessageBox.warning(
+                self,
+                "Speaker",
+                "File video project tidak ditemukan. Pilih video lagi sebelum Analisis Speaker.",
+            )
             return
         video = str(self.project.video_path)
         entries = [e.clone() for e in self.project.entries]
