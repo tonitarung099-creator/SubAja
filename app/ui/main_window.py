@@ -21,7 +21,7 @@ from app.core.project import SubtitleProject
 from app.core.speaker import SpeakerDiarizer, apply_speaker_segments
 from app.core.style import apply_reference_film_style
 from app.core.subtitle import ms_to_timestamp, renumber
-from app.core.verbatim import is_verbatim_safe, tidy_entries
+from app.core.verbatim import is_verbatim_safe, tidy_entries, visible_length
 from .api_manager import ApiManagerDialog
 
 
@@ -378,7 +378,8 @@ class MainWindow(QMainWindow):
                     if col == 5:
                         item.setToolTip(qc.message)
                     self.table.setItem(row, col, item)
-                self.table.setRowHeight(row, 48 if "\n" in e.text else 34)
+                needs_two_lines = "\n" in e.text or visible_length(e.text) > 55
+                self.table.setRowHeight(row, 48 if needs_two_lines else 34)
         finally:
             self._updating_table = False
         self.apply_qc_filter()
