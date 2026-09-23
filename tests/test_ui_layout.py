@@ -151,3 +151,23 @@ def test_loading_project_with_missing_video_clears_previous_player_source(tmp_pa
 
     win.close()
     app.processEvents()
+
+
+def test_autosave_failure_remains_visible_in_status_bar(tmp_path, monkeypatch):
+    app = _app()
+    win = MainWindow()
+    win.project.project_path = tmp_path / "project.subaja.json"
+
+    def fail_save(_path):
+        raise OSError("disk penuh")
+
+    monkeypatch.setattr(win.project, "save_session", fail_save)
+    ok = win._autosave_project()
+    app.processEvents()
+
+    assert ok is False
+    assert "Autosave gagal" in win.statusBar().currentMessage()
+    assert "disk penuh" in win.statusBar().currentMessage()
+
+    win.close()
+    app.processEvents()
