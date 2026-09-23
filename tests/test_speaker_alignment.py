@@ -29,3 +29,18 @@ def test_overlapping_speakers_are_not_auto_split():
     out = apply_speaker_segments([entry], segments, split_on_change=True)
     assert len(out) == 1
     assert "tumpang tindih" in out[0].review_reason
+
+
+def test_reanalysis_clears_stale_speaker_when_no_segment_matches():
+    entry = SubtitleEntry(
+        1, 1000, 2000, "Aku pulang.",
+        speaker="Speaker 9",
+        speaker_confidence=0.99,
+        original_text="Aku pulang.",
+        source_index=1,
+    )
+    out = apply_speaker_segments([entry], [], split_on_change=True)
+    assert len(out) == 1
+    assert out[0].speaker == ""
+    assert out[0].speaker_confidence == 0.0
+    assert "Tidak ada speaker" in out[0].review_reason
