@@ -88,3 +88,55 @@ def test_corrupt_project_load_does_not_mutate_existing_state(tmp_path: Path):
     assert project.srt_path == tmp_path / "old.srt"
     assert len(project.entries) == 1
     assert project.entries[0].text == "Lama"
+
+
+def test_project_rejects_semantically_invalid_entry_without_mutating_state(tmp_path: Path):
+    project = SubtitleProject(
+        video_path=tmp_path / "old.mp4",
+        entries=[SubtitleEntry(1, 0, 1000, "Lama", original_text="Lama", source_index=1)],
+    )
+    bad = tmp_path / "bad-types.subaja.json"
+    bad.write_text(
+        """{
+  "version": 1,
+  "video_path": "C:/baru.mp4",
+  "srt_path": "",
+  "entries": [
+    {"index": 1, "start_ms": "rusak", "end_ms": 2000, "text": "Baru", "speaker": "", "speaker_confidence": 0.0, "original_text": "Baru", "source_index": 1, "review_reason": ""}
+  ]
+}""",
+        encoding="utf-8",
+    )
+
+    try:
+        project.load_session(bad)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Project dengan tipe timing invalid harus ditolak.")
+
+    assert project.video_path == tmp_path / "old.mp4"
+    assert len(project.entries) == 1
+    assert project.entries[0].text == "Lama"
+
+
+def test_project_rejects_out_of_range_speaker_confidence(tmp_path: Path):
+    bad = tmp_path / "bad-confidence.subaja.json"
+    bad.write_text(
+        """{
+  "version": 1,
+  "video_path": "",
+  "srt_path": "",
+  "entries": [
+    {"index": 1, "start_ms": 0, "end_ms": 2000, "text": "A", "speaker": "Speaker 1", "speaker_confidence": 3.5, "original_text": "A", "source_index": 1, "review_reason": ""}
+  ]
+}""",
+        encoding="utf-8",
+    )
+    project = SubtitleProject()
+    try:
+        project.load_session(bad)
+    except ValueError as exc:
+        assert "speaker_confidence" in str(exc)
+    else:
+        raise AssertionError("Confidence di luar 0..1 harus ditolak.")
