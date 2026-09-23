@@ -30,14 +30,14 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
     """Hemat Free Tier: kirim hanya caption yang masih tampak perlu bantuan AI."""
     flat = " ".join(entry.text.replace("\n", " ").split()).strip()
     visible = " ".join(visible_text(entry.text).replace("\n", " ").split()).strip()
-    if not flat:
+    if not visible:
         return False
     if entry.review_reason:
         return True
 
     first_alpha = next((ch for ch in visible if ch.isalpha()), "")
     starts_clean = not first_alpha or first_alpha.isupper()
-    ends_clean = flat.endswith((".", "?", "!", "…", '."', '?"', '!"', ".”", "?”", "!”"))
+    ends_clean = visible.endswith((".", "?", "!", "…", '."', '?"', '!"', ".”", "?”", "!”"))
     spacing_clean = "  " not in entry.text and " ," not in entry.text and " ." not in entry.text
 
     # Kalimat tanya bahasa Indonesia sering ditranskrip CapCut sebagai titik biasa.
@@ -54,7 +54,7 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
         or any(token in lower for token in (" kenapa ", " bagaimana ", " berapa ", " siapa ", " kapan "))
         or lower.endswith(question_particles)
     )
-    if looks_like_question and not flat.endswith(("?", '?"', "?”")):
+    if looks_like_question and not visible.endswith(("?", '?"', "?”")):
         return True
 
     return not (starts_clean and ends_clean and spacing_clean)
