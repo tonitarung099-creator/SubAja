@@ -43,6 +43,7 @@ Gemini bersifat opsional. Speaker diarization, pemisahan dialog, formatting, QC,
 - Gemini API Manager dengan 100 slot dan satu key aktif.
 - Tidak ada auto-rotation key saat terkena rate limit.
 - Cache Gemini sehingga proses film panjang dapat dilanjutkan tanpa mengulang hasil yang sudah selesai.
+- Save/Resume Project (`.subaja.json`) untuk menyimpan hasil speaker, pembagian caption, koreksi, dan QC film panjang.
 - Export SRT bersih; label speaker opsional dan default-nya tidak ditampilkan.
 
 ## Menjalankan dari source
