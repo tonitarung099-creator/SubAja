@@ -21,7 +21,7 @@ from app.core.project import SubtitleProject
 from app.core.speaker import SpeakerDiarizer, apply_speaker_segments
 from app.core.style import apply_reference_film_style
 from app.core.subtitle import ms_to_timestamp, renumber
-from app.core.verbatim import tidy_entries
+from app.core.verbatim import is_verbatim_safe, tidy_entries
 from .api_manager import ApiManagerDialog
 
 
@@ -51,6 +51,8 @@ class MainWindow(QMainWindow):
         self.vault = KeyVault()
         self._thread = None
         self._worker = None
+        self._worker_done_callback = None
+        self._worker_title = ""
         self._updating_table = False
         self._qc_results = []
 
@@ -371,7 +373,19 @@ class MainWindow(QMainWindow):
             return
 
         old_text = entry.text
-        entry.text = self.table.item(row, col).text()
+        new_text = self.table.item(row, col).text()
+        if not is_verbatim_safe(old_text, new_text):
+            self._updating_table = True
+            try:
+                self.table.item(row, col).setText(old_text)
+            finally:
+                self._updating_table = False
+            self.statusBar().showMessage(
+                "Word Lock: edit ditolak karena mengubah kata, tag format, atau struktur dialog dua speaker."
+            )
+            return
+
+        entry.text = new_text
         if not source_group_is_safe(self.project.entries, entry.source_index):
             entry.text = old_text
             self._updating_table = True
@@ -420,48 +434,90 @@ class MainWindow(QMainWindow):
             self.player.play()
 
     def _set_busy(self, busy: bool, message: str = ""):
-        self.speaker_btn.setEnabled(not busy)
+        self.centralWidget().setEnabled(not busy)
+        self.menuBar().setEnabled(not busy)
         if message:
             self.statusBar().showMessage(message)
 
+    def _worker_running(self) -> bool:
+        if self._thread is None:
+            return False
+        try:
+            return self._thread.isRunning()
+        except RuntimeError:
+            self._thread = None
+            self._worker = None
+            self._worker_done_callback = None
+            return False
+
     def _run_worker(self, fn, on_done, title: str):
-        if self._thread is not None:
-            try:
-                if self._thread.isRunning():
-                    QMessageBox.information(self, "SubAja", "Masih ada proses yang berjalan.")
-                    return
-            except RuntimeError:
-                self._thread = None
-                self._worker = None
+        if self._worker_running():
+            QMessageBox.information(self, "SubAja", "Masih ada proses yang berjalan.")
+            return
+
         self.progress.setValue(0)
+        self._worker_done_callback = on_done
+        self._worker_title = title
         self._set_busy(True, title)
+
         self._thread = QThread(self)
         self._worker = FunctionWorker(fn)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
-        self._worker.progress.connect(lambda p, m: (self.progress.setValue(p), self.statusBar().showMessage(m or title)))
-        thread = self._thread
-        worker = self._worker
-        worker.done.connect(on_done)
-        worker.done.connect(thread.quit)
-        worker.done.connect(worker.deleteLater)
-        worker.error.connect(self._on_worker_error)
-        worker.error.connect(thread.quit)
-        worker.error.connect(worker.deleteLater)
-        thread.finished.connect(lambda: self._worker_thread_finished(thread))
-        thread.start()
+        self._worker.progress.connect(self._on_worker_progress)
+        self._worker.done.connect(self._on_worker_done)
+        self._worker.done.connect(self._thread.quit)
+        self._worker.done.connect(self._worker.deleteLater)
+        self._worker.error.connect(self._on_worker_error)
+        self._worker.error.connect(self._thread.quit)
+        self._worker.error.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._worker_thread_finished)
+        self._thread.start()
 
-    def _worker_thread_finished(self, thread: QThread):
+    def _on_worker_progress(self, percent: int, message: str):
+        self.progress.setValue(max(0, min(100, int(percent))))
+        self.statusBar().showMessage(message or self._worker_title)
+
+    def _on_worker_done(self, value):
+        callback = self._worker_done_callback
+        if callback is None:
+            return
+        try:
+            callback(value)
+        except Exception as exc:
+            self.progress.setValue(0)
+            QMessageBox.critical(self, "Proses gagal", str(exc))
+            self.statusBar().showMessage("Hasil proses gagal diterapkan.")
+
+    def _worker_thread_finished(self):
+        thread = self._thread
         self._set_busy(False)
-        if self._thread is thread:
-            self._thread = None
-            self._worker = None
-        thread.deleteLater()
+        self._worker = None
+        self._thread = None
+        self._worker_done_callback = None
+        self._worker_title = ""
+        if thread is not None:
+            try:
+                thread.deleteLater()
+            except RuntimeError:
+                pass
 
     def _on_worker_error(self, message: str):
+        self._worker_done_callback = None
         self.progress.setValue(0)
         QMessageBox.critical(self, "Proses gagal", message)
         self.statusBar().showMessage("Proses gagal.")
+
+    def closeEvent(self, event):
+        if self._worker_running():
+            QMessageBox.information(
+                self,
+                "SubAja",
+                "Proses masih berjalan. Tunggu sampai selesai sebelum menutup aplikasi.",
+            )
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     def analyze_speakers(self):
         if not self.project.video_path or not self.project.entries:
