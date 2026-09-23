@@ -92,7 +92,17 @@ class KeyVault:
             "model": self.model,
             "keys": [base64.b64encode(_protect(k.encode("utf-8"))).decode("ascii") if k else "" for k in self.keys],
         }
-        self.path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        encoded = json.dumps(payload, indent=2)
+        tmp = self.path.with_name(self.path.name + ".tmp")
+        try:
+            tmp.write_text(encoded, encoding="utf-8")
+            tmp.replace(self.path)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
 
     @property
     def keys(self) -> list[str]:
