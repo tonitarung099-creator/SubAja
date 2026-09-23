@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 import json
 
+from .qc import changed_source_indices
 from .style import apply_reference_film_style
 from .subtitle import SubtitleEntry, load_srt, renumber, save_srt
 
@@ -118,4 +119,9 @@ class SubtitleProject:
         reference_film_style: bool = True,
     ):
         entries = apply_reference_film_style(self.entries) if reference_film_style else self.entries
+        changed = changed_source_indices(entries)
+        if changed:
+            raise ValueError(
+                f"Export diblokir: Word Lock gagal setelah styling pada {len(changed)} caption sumber."
+            )
         save_srt(path, entries, include_speaker=include_speaker)
