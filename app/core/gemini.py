@@ -36,9 +36,6 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
     visible = " ".join(visible_text(entry.text).replace("\n", " ").split()).strip()
     if not visible:
         return False
-    if entry.review_reason:
-        return True
-
     first_alpha = next((ch for ch in visible if ch.isalpha()), "")
     starts_clean = not first_alpha or first_alpha.isupper()
     ends_clean = visible.endswith((".", "?", "!", "…", '."', '?"', '!"', ".”", "?”", "!”"))
@@ -52,11 +49,24 @@ def needs_gemini_punctuation(entry: SubtitleEntry) -> bool:
         "bagaimana ", "berapa ", "mana ", "di mana ", "dimana ",
         "ke mana ", "kemana ", "dari mana ", "darimana ",
     )
-    question_particles = (" nggak?", " tidak?", " kan?", " ya?")
+    question_phrases = (
+        " kenapa ", " bagaimana ", " berapa ", " siapa ", " kapan ",
+        " di mana ", " dimana ", " ke mana ", " kemana ",
+        " dari mana ", " darimana ",
+    )
+    without_terminal = lower.rstrip(".!… ").strip()
+    words = without_terminal.split()
+    trailing_question_particle = (
+        len(words) > 1
+        and any(
+            without_terminal.endswith(suffix)
+            for suffix in (" nggak", " tidak", " kan", " ya")
+        )
+    )
     looks_like_question = (
         lower.startswith(question_starters)
-        or any(token in lower for token in (" kenapa ", " bagaimana ", " berapa ", " siapa ", " kapan "))
-        or lower.endswith(question_particles)
+        or any(token in f" {lower} " for token in question_phrases)
+        or trailing_question_particle
     )
     if looks_like_question and not visible.endswith(("?", '?"', "?”")):
         return True
