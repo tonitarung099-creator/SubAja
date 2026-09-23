@@ -19,6 +19,7 @@ from app.core.keyvault import KeyVault
 from app.core.qc import audit_entries, changed_source_indices, source_group_is_safe
 from app.core.project import SubtitleProject
 from app.core.speaker import SpeakerDiarizer, apply_speaker_segments
+from app.core.style import apply_reference_film_style
 from app.core.subtitle import ms_to_timestamp, renumber
 from app.core.verbatim import tidy_entries
 from .api_manager import ApiManagerDialog
@@ -177,13 +178,13 @@ class MainWindow(QMainWindow):
         layout.addLayout(ops)
 
         ops2 = QHBoxLayout()
-        local_btn = QPushButton("2. Rapikan Lokal")
+        local_btn = QPushButton("2. Rapikan + Gaya Film")
         local_btn.clicked.connect(self.tidy_local)
         ops2.addWidget(local_btn)
         api_btn = QPushButton("Gemini API (100)")
         api_btn.clicked.connect(self.open_api_manager)
         ops2.addWidget(api_btn)
-        gemini_btn = QPushButton("3. Gemini: Tanda Baca Saja")
+        gemini_btn = QPushButton("3. Gemini Hemat: Tanda Baca")
         gemini_btn.clicked.connect(self.run_gemini)
         ops2.addWidget(gemini_btn)
         ops2.addStretch(1)
@@ -407,8 +408,11 @@ class MainWindow(QMainWindow):
         if not self.project.entries:
             return
         self.project.entries = tidy_entries(self.project.entries)
+        self.project.entries = apply_reference_film_style(self.project.entries)
         self.refresh_table()
-        self.statusBar().showMessage("Rapikan lokal selesai. Tidak ada kata yang diubah.")
+        self.statusBar().showMessage(
+            "Gaya film diterapkan: maks. 2 baris, 42 karakter/baris, dialog dua speaker memakai tanda -."
+        )
 
     def open_api_manager(self):
         dlg = ApiManagerDialog(self.vault, self)
@@ -436,11 +440,11 @@ class MainWindow(QMainWindow):
             self.refresh_table()
             self.progress.setValue(100)
             self.statusBar().showMessage(
-                f"Gemini selesai. Diproses {stats.processed}, cache {stats.cached}, "
-                f"ditolak karena mengubah kata {stats.rejected_word_changes}."
+                f"Gemini hemat selesai. Dikirim {stats.processed}, dilewati {stats.skipped_clean}, "
+                f"cache {stats.cached}, ditolak Word Lock {stats.rejected_word_changes}."
             )
 
-        self._run_worker(task, done, "Gemini merapikan tanda baca dengan Word Lock...")
+        self._run_worker(task, done, "Gemini hemat: hanya caption yang masih perlu tanda baca...")
 
     def export_srt(self):
         if not self.project.entries:
