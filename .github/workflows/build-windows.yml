@@ -1,0 +1,68 @@
+name: Build SubAja Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "assets/**"
+      - "build/**"
+      - "scripts/**"
+      - "tests/**"
+      - "requirements*.txt"
+      - "run.py"
+      - ".github/workflows/build-windows.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+
+      - name: Download offline speaker models
+        shell: pwsh
+        run: python scripts/download_models.py
+
+      - name: Run tests
+        shell: pwsh
+        run: python -m pytest -q
+
+      - name: Build EXE
+        shell: pwsh
+        run: python -m PyInstaller --noconfirm --clean build/SubAja.spec
+
+      - name: Verify EXE
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/SubAja.exe")) { throw "SubAja.exe was not created" }
+          Get-Item "dist/SubAja.exe" | Format-List Name,Length,FullName
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubAja-Windows-EXE
+          path: dist/SubAja.exe
+          if-no-files-found: error
+          retention-days: 30
