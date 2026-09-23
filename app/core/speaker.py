@@ -155,7 +155,10 @@ def prepare_entries_for_speaker_reanalysis(entries: list[SubtitleEntry]) -> list
         else:
             source_has_dialogue = any(dialogue_structure(e.original_text) for e in group)
             if source_has_dialogue:
-                text = "\n".join(
+                # Legacy project dari versi lama mungkin sempat memecah cue
+                # dialog sumber. Pulihkan struktur asli CapCut daripada
+                # menebak ulang tanda '-' dari potongan lama.
+                text = first.original_text or "\n".join(
                     e.text.strip()
                     for e in group
                     if e.text.strip()
