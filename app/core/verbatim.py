@@ -136,6 +136,12 @@ def wrap_two_lines(text: str, max_chars: int = 42) -> str:
     """Wrap to at most two visually balanced lines without changing words."""
     if dialogue_structure(text):
         return "\n".join(line.strip() for line in text.splitlines() if line.strip())
+
+    # Jangan pecah teks yang mengandung markup berdasarkan spasi mentah.
+    # Tag seperti <font color="#fff"> bisa terbelah menjadi tag tidak valid.
+    if has_formatting_markup(text):
+        return text
+
     flat = " ".join(text.replace("\n", " ").split())
     if visible_length(flat) <= max_chars:
         return flat
