@@ -111,7 +111,11 @@ class ApiManagerDialog(QDialog):
 
     def save_and_accept(self):
         self._sync()
-        self.vault.save()
+        try:
+            self.vault.save()
+        except Exception as exc:
+            QMessageBox.critical(self, "Gemini", f"Gagal menyimpan API key:\n{exc}")
+            return
         self._saved = True
         self._snapshot = copy.deepcopy(self.vault.data)
         self.accept()
