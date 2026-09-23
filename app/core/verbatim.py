@@ -78,10 +78,22 @@ def ensure_terminal_punctuation(text: str) -> str:
     stripped = text.rstrip()
     if not stripped:
         return stripped
-    if stripped[-1] in ".!?…,:;-'\"”’":
-        return stripped
-    return stripped + "."
 
+    visible = visible_text(stripped).rstrip()
+    if not visible or visible[-1] in ".!?…,:;-'\"”’":
+        return stripped
+
+    # Put punctuation before trailing formatting tags:
+    # <i>Aku pulang</i> -> <i>Aku pulang.</i>
+    trailing: list[str] = []
+    body = stripped
+    while True:
+        match = re.search(r"(<\/[^>\r\n]+>|\{\\[^}\r\n]*\})$", body)
+        if not match:
+            break
+        trailing.insert(0, match.group(0))
+        body = body[: match.start()].rstrip()
+    return body + "." + "".join(trailing)
 
 def wrap_two_lines(text: str, max_chars: int = 42) -> str:
     """Wrap to at most two visually balanced lines without changing words."""
