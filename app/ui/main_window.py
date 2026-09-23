@@ -425,9 +425,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(message)
 
     def _run_worker(self, fn, on_done, title: str):
-        if self._thread and self._thread.isRunning():
-            QMessageBox.information(self, "SubAja", "Masih ada proses yang berjalan.")
-            return
+        if self._thread is not None:
+            try:
+                if self._thread.isRunning():
+                    QMessageBox.information(self, "SubAja", "Masih ada proses yang berjalan.")
+                    return
+            except RuntimeError:
+                self._thread = None
+                self._worker = None
         self.progress.setValue(0)
         self._set_busy(True, title)
         self._thread = QThread(self)
@@ -435,13 +440,23 @@ class MainWindow(QMainWindow):
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(lambda p, m: (self.progress.setValue(p), self.statusBar().showMessage(m or title)))
-        self._worker.done.connect(on_done)
-        self._worker.done.connect(self._thread.quit)
-        self._worker.error.connect(self._on_worker_error)
-        self._worker.error.connect(self._thread.quit)
-        self._thread.finished.connect(lambda: self._set_busy(False))
-        self._thread.finished.connect(self._thread.deleteLater)
-        self._thread.start()
+        thread = self._thread
+        worker = self._worker
+        worker.done.connect(on_done)
+        worker.done.connect(thread.quit)
+        worker.done.connect(worker.deleteLater)
+        worker.error.connect(self._on_worker_error)
+        worker.error.connect(thread.quit)
+        worker.error.connect(worker.deleteLater)
+        thread.finished.connect(lambda: self._worker_thread_finished(thread))
+        thread.start()
+
+    def _worker_thread_finished(self, thread: QThread):
+        self._set_busy(False)
+        if self._thread is thread:
+            self._thread = None
+            self._worker = None
+        thread.deleteLater()
 
     def _on_worker_error(self, message: str):
         self.progress.setValue(0)
