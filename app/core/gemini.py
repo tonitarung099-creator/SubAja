@@ -224,9 +224,12 @@ class GeminiPunctuator:
                 candidate = results[e.index]
                 # Absolute word lock. Gemini output is discarded if one lexical token changes.
                 if is_verbatim_safe(e.text, candidate):
-                    candidate = wrap_two_lines(candidate, max_chars=42)
-                    out[positions[e.index]] = e.clone(text=candidate)
-                    self.cache.put(self.model, cache_materials[e.index], candidate)
+                    wrapped = wrap_two_lines(candidate, max_chars=42)
+                    if is_verbatim_safe(e.text, wrapped):
+                        out[positions[e.index]] = e.clone(text=wrapped)
+                        self.cache.put(self.model, cache_materials[e.index], wrapped)
+                    else:
+                        stats.rejected_word_changes += 1
                 else:
                     stats.rejected_word_changes += 1
                 stats.processed += 1
