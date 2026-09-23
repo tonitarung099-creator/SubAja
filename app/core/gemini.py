@@ -107,7 +107,7 @@ class GeminiPunctuator:
             raise GeminiError(msg) from exc
 
     def _call_batch(self, entries: list[SubtitleEntry]) -> dict[int, str]:
-        payload = [{"id": e.index, "speaker": e.speaker or None, "text": e.text.replace("\n", " ")} for e in entries]
+        payload = [{"id": e.index, "speaker": e.speaker or None, "text": e.text} for e in entries]
         prompt = (
             "Anda adalah editor tanda baca subtitle film Indonesia.\n"
             "ATURAN MUTLAK:\n"
@@ -118,7 +118,8 @@ class GeminiPunctuator:
             "5. Jangan menggabungkan, menghapus, atau memecah ID subtitle.\n"
             "6. Kembalikan JSON array saja dengan bentuk [{\"id\":1,\"text\":\"...\"}].\n"
             "7. Maksimal dua baris per subtitle.\n"
-            "8. Pertahankan tag format SRT/ASS seperti <i>...</i>, <b>...</b>, atau {\\...} PERSIS seperti sumber.\n\n"
+            "8. Pertahankan tag format SRT/ASS seperti <i>...</i>, <b>...</b>, atau {\\...} PERSIS seperti sumber.\n"
+            "9. Jika subtitle memiliki dua baris yang diawali tanda - untuk dua pembicara, pertahankan dua baris dan tanda - tersebut PERSIS.\n\n"
             "SUBTITLE:\n" + json.dumps(payload, ensure_ascii=False)
         )
         try:
