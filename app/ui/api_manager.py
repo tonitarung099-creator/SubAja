@@ -39,7 +39,7 @@ class ApiManagerDialog(QDialog):
         note = QLabel(
             "Simpan hingga 100 API key. Hanya SATU key aktif yang dipakai. "
             "Aplikasi tidak melakukan rotasi otomatis untuk melewati rate limit. "
-            "Gemini API pada September 2026 memerlukan authorization key (auth key); standard key lama dapat ditolak."
+            "Masukkan API key Gemini yang dibuat untuk project Google AI Studio/Google Cloud milikmu."
         )
         note.setWordWrap(True)
         root.addWidget(note)
@@ -83,12 +83,12 @@ class ApiManagerDialog(QDialog):
         self.test_btn.clicked.connect(self.test_active)
         buttons.addWidget(self.test_btn)
         buttons.addStretch(1)
-        save_btn = QPushButton("Simpan")
-        save_btn.clicked.connect(self.save_and_accept)
-        cancel_btn = QPushButton("Batal")
-        cancel_btn.clicked.connect(self.reject)
-        buttons.addWidget(save_btn)
-        buttons.addWidget(cancel_btn)
+        self.save_btn = QPushButton("Simpan")
+        self.save_btn.clicked.connect(self.save_and_accept)
+        self.cancel_btn = QPushButton("Batal")
+        self.cancel_btn.clicked.connect(self.reject)
+        buttons.addWidget(self.save_btn)
+        buttons.addWidget(self.cancel_btn)
         root.addLayout(buttons)
 
     def _choose_active(self, row: int, col: int):
@@ -107,26 +107,64 @@ class ApiManagerDialog(QDialog):
         self.vault.save()
         self.accept()
 
+    def _test_running(self) -> bool:
+        if self.thread is None:
+            return False
+        try:
+            return self.thread.isRunning()
+        except RuntimeError:
+            self.thread = None
+            self.worker = None
+            return False
+
+    def reject(self):
+        if self._test_running():
+            QMessageBox.information(self, "Gemini", "Tunggu test API key selesai sebelum menutup jendela ini.")
+            return
+        super().reject()
+
+    def closeEvent(self, event):
+        if self._test_running():
+            QMessageBox.information(self, "Gemini", "Tunggu test API key selesai sebelum menutup jendela ini.")
+            event.ignore()
+            return
+        super().closeEvent(event)
+
     def test_active(self):
+        if self._test_running():
+            return
         self._sync()
         key = self.vault.active_key
         if not key:
             QMessageBox.warning(self, "Gemini", "Slot aktif belum berisi API key.")
             return
         self.test_btn.setEnabled(False)
+        self.save_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(False)
         self.test_btn.setText("Menguji...")
         self.thread = QThread(self)
         self.worker = TestWorker(key, self.vault.model)
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
-        self.worker.done.connect(self._test_done)
-        self.worker.done.connect(self.thread.quit)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.start()
+        thread = self.thread
+        worker = self.worker
+        worker.done.connect(self._test_done)
+        worker.done.connect(thread.quit)
+        worker.done.connect(worker.deleteLater)
+        thread.finished.connect(lambda: self._test_thread_finished(thread))
+        thread.start()
+
+    def _test_thread_finished(self, thread: QThread):
+        self.test_btn.setEnabled(True)
+        self.save_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(True)
+        self.test_btn.setText("Test Key Aktif")
+        if self.thread is thread:
+            self.thread = None
+            self.worker = None
+        thread.deleteLater()
 
     def _test_done(self, ok: bool, message: str):
-        self.test_btn.setEnabled(True)
-        self.test_btn.setText("Test Key Aktif")
         if ok:
             QMessageBox.information(self, "Gemini", f"Key aktif berhasil. Respons: {message[:80]}")
         else:
