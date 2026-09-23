@@ -105,7 +105,7 @@ class SpeakerDiarizer:
 
 def _segments_inside_entry(entry: SubtitleEntry, segments: Iterable[SpeakerSegment]) -> list[tuple[int, str, int]]:
     clipped: list[tuple[int, str, int]] = []
-    for s in segments:
+    for s in sorted(segments, key=lambda x: (x.start_ms, x.end_ms, x.speaker)):
         overlap = _overlap_ms(entry.start_ms, entry.end_ms, s.start_ms, s.end_ms)
         if overlap <= 0:
             continue
@@ -115,7 +115,7 @@ def _segments_inside_entry(entry: SubtitleEntry, segments: Iterable[SpeakerSegme
             continue
         if clipped and clipped[-1][1] == s.speaker and start - clipped[-1][2] <= 160:
             old = clipped[-1]
-            clipped[-1] = (old[0], old[1], end)
+            clipped[-1] = (old[0], old[1], max(old[2], end))
         else:
             clipped.append((start, s.speaker, end))
     return clipped
