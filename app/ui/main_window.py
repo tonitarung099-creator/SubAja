@@ -365,7 +365,8 @@ class MainWindow(QMainWindow):
         if col == 3:
             entry.speaker = self.table.item(row, col).text().strip()
             entry.speaker_confidence = 1.0 if entry.speaker else 0.0
-            entry.review_reason = ""
+            # Jangan hapus review_reason di sini: peringatan bisa terkait batas
+            # kata, overlap, atau tag format, bukan hanya nama speaker.
             self.refresh_table()
             self._autosave_project()
             return
