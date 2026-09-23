@@ -111,11 +111,22 @@ class GeminiPunctuator:
             raise GeminiError("Paket google-genai tidak tersedia.") from exc
         return genai.Client(api_key=self.api_key)
 
+    @staticmethod
+    def _low_thinking_config():
+        try:
+            from google.genai import types
+        except ImportError as exc:
+            raise GeminiError("Paket google-genai tidak tersedia.") from exc
+        return types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_level="low")
+        )
+
     def test(self) -> str:
         try:
             response = self._client().models.generate_content(
                 model=self.model,
                 contents="Balas hanya dengan kata OK.",
+                config=self._low_thinking_config(),
             )
             return (response.text or "").strip()
         except Exception as exc:
@@ -141,7 +152,11 @@ class GeminiPunctuator:
             "SUBTITLE:\n" + json.dumps(payload, ensure_ascii=False)
         )
         try:
-            response = self._client().models.generate_content(model=self.model, contents=prompt)
+            response = self._client().models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=self._low_thinking_config(),
+            )
             data = _extract_json(response.text or "")
             return {int(x["id"]): str(x["text"]) for x in data if "id" in x and "text" in x}
         except Exception as exc:
