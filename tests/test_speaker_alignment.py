@@ -142,3 +142,18 @@ def test_speaker_confidence_is_reduced_when_audio_coverage_is_low():
     assert out[0].speaker == "Speaker 1"
     assert 0.09 <= out[0].speaker_confidence <= 0.11
     assert "durasi caption" in out[0].review_reason
+
+
+def test_estimated_split_confidence_never_exceeds_audio_coverage():
+    entry = SubtitleEntry(
+        1, 0, 5000, "aku pulang kamu tunggu di sini",
+        original_text="aku pulang kamu tunggu di sini",
+        source_index=1,
+    )
+    segments = [
+        SpeakerSegment(0, 1500, "Speaker 1"),
+        SpeakerSegment(1500, 3000, "Speaker 2"),
+    ]
+    out = apply_speaker_segments([entry], segments, split_on_change=True)
+    assert len(out) == 2
+    assert all(abs(x.speaker_confidence - 0.60) < 0.001 for x in out)
