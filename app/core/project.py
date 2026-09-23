@@ -8,6 +8,41 @@ from .style import apply_reference_film_style
 from .subtitle import SubtitleEntry, load_srt, renumber, save_srt
 
 
+def _validated_project_entry(item: dict) -> SubtitleEntry:
+    if not isinstance(item, dict):
+        raise ValueError("entry subtitle bukan object JSON.")
+
+    entry = SubtitleEntry(**item)
+
+    if not isinstance(entry.index, int) or isinstance(entry.index, bool):
+        raise ValueError("index subtitle harus integer.")
+    if not isinstance(entry.start_ms, int) or isinstance(entry.start_ms, bool):
+        raise ValueError("start_ms subtitle harus integer.")
+    if not isinstance(entry.end_ms, int) or isinstance(entry.end_ms, bool):
+        raise ValueError("end_ms subtitle harus integer.")
+    if entry.start_ms < 0 or entry.end_ms <= entry.start_ms:
+        raise ValueError("rentang waktu subtitle tidak valid.")
+    if not isinstance(entry.text, str) or not entry.text.strip():
+        raise ValueError("text subtitle harus string dan tidak boleh kosong.")
+    if not isinstance(entry.original_text, str):
+        raise ValueError("original_text subtitle harus string.")
+    if not isinstance(entry.speaker, str):
+        raise ValueError("speaker subtitle harus string.")
+    if isinstance(entry.speaker_confidence, bool) or not isinstance(entry.speaker_confidence, (int, float)):
+        raise ValueError("speaker_confidence harus angka.")
+    entry.speaker_confidence = float(entry.speaker_confidence)
+    if not 0.0 <= entry.speaker_confidence <= 1.0:
+        raise ValueError("speaker_confidence harus antara 0 dan 1.")
+    if entry.source_index is not None and (
+        not isinstance(entry.source_index, int) or isinstance(entry.source_index, bool)
+    ):
+        raise ValueError("source_index harus integer atau null.")
+    if not isinstance(entry.review_reason, str):
+        raise ValueError("review_reason subtitle harus string.")
+
+    return entry
+
+
 @dataclass
 class SubtitleProject:
     video_path: Path | None = None
@@ -67,7 +102,7 @@ class SubtitleProject:
         new_video_path = Path(payload["video_path"]) if payload.get("video_path") else None
         new_srt_path = Path(payload["srt_path"]) if payload.get("srt_path") else None
         try:
-            new_entries = renumber(SubtitleEntry(**item) for item in raw_entries)
+            new_entries = renumber(_validated_project_entry(item) for item in raw_entries)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Project SubAja rusak: data subtitle tidak valid ({exc}).") from exc
 
