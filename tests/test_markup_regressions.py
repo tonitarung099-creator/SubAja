@@ -9,6 +9,7 @@ from app.core.verbatim import (
     lexical_tokens,
     split_words_preserving,
     tidy_local,
+    wrap_two_lines,
 )
 
 
@@ -70,3 +71,11 @@ def test_word_lock_rejects_moved_italic_scope():
     moved = "<i>Aku pulang.</i>"
     assert formatting_signature(src) != formatting_signature(moved)
     assert not is_verbatim_safe(src, moved)
+
+
+def test_wrap_two_lines_never_breaks_font_tag_attributes():
+    src = '<font color="#ffffff">Ini kalimat subtitle yang cukup panjang untuk melewati batas empat puluh dua karakter.</font>'
+    out = wrap_two_lines(src, max_chars=42)
+    assert out == src
+    assert '<font color="#ffffff">' in out
+    assert is_verbatim_safe(src, out)
