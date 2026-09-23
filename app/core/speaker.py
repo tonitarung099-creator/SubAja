@@ -8,7 +8,7 @@ import os
 from .audio import extract_mono_wav
 from .resources import model_paths
 from .subtitle import SubtitleEntry, renumber
-from .verbatim import has_formatting_markup, split_entry_by_boundaries
+from .verbatim import has_formatting_markup, remove_dialogue_prefixes, split_entry_by_boundaries
 
 
 @dataclass(slots=True)
@@ -123,6 +123,13 @@ def apply_speaker_segments(
 ) -> list[SubtitleEntry]:
     output: list[SubtitleEntry] = []
     for entry in entries:
+        cleaned_text = remove_dialogue_prefixes(entry.text)
+        entry = entry.clone(
+            text=cleaned_text,
+            speaker="",
+            speaker_confidence=0.0,
+            review_reason="",
+        )
         overlaps = _segments_inside_entry(entry, segments)
         if not overlaps:
             output.append(
