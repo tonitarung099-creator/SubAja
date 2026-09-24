@@ -49,6 +49,10 @@ jobs:
         shell: pwsh
         run: python scripts/download_models.py
 
+      - name: Prepare Windows icon
+        shell: pwsh
+        run: python scripts/prepare_icon.py
+
       - name: Run tests
         shell: pwsh
         run: python -m pytest -q
