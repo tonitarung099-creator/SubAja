@@ -1,5 +1,8 @@
+from types import SimpleNamespace
+
 from app.core.gemini import (
     GeminiError,
+    GeminiPunctuator,
     _cache_material,
     _normalize_batch_response,
     estimate_gemini_work,
@@ -76,3 +79,49 @@ def test_gemini_batch_response_rejects_duplicate_known_id():
 def test_gemini_batch_response_ignores_unknown_ids():
     data = [{"id": 99, "text": "asing"}, {"id": 2, "text": "Benar."}]
     assert _normalize_batch_response(data, {2}) == {2: "Benar."}
+
+
+class _FakeModels:
+    def __init__(self, owner, text):
+        self.owner = owner
+        self.text = text
+
+    def generate_content(self, **kwargs):
+        assert self.owner.entered is True
+        assert self.owner.closed is False
+        return SimpleNamespace(text=self.text)
+
+
+class _FakeClient:
+    def __init__(self, text="OK"):
+        self.entered = False
+        self.closed = False
+        self.models = _FakeModels(self, text)
+
+    def __enter__(self):
+        self.entered = True
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.closed = True
+
+
+def test_gemini_test_holds_client_open_until_request_finishes(monkeypatch):
+    punctuator = GeminiPunctuator("test-key", "gemini-3.8-flash")
+    fake = _FakeClient("OK")
+    monkeypatch.setattr(punctuator, "_client", lambda: fake)
+
+    assert punctuator.test() == "OK"
+    assert fake.entered is True
+    assert fake.closed is True
+
+
+def test_gemini_batch_holds_client_open_until_request_finishes(monkeypatch):
+    punctuator = GeminiPunctuator("test-key", "gemini-3.8-flash")
+    fake = _FakeClient('[{"id":1,"text":"Aku pulang."}]')
+    monkeypatch.setattr(punctuator, "_client", lambda: fake)
+
+    result = punctuator._call_batch([make("Aku pulang.")])
+    assert result == {1: "Aku pulang."}
+    assert fake.entered is True
+    assert fake.closed is True
