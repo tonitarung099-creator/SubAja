@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 
 root = Path(os.getcwd()).resolve()
-logo = root / "assets" / "subaja-logo.png"
+logo = root / "assets" / "subaja-logo.png"\nicon = root / "assets" / "subaja.ico"
 
 datas = [
     (str(root / "assets" / "models" / "segmentation" / "model.int8.onnx"), "assets/models/segmentation"),
@@ -58,7 +58,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(logo),
+    icon=str(icon),
 )
 
 coll = COLLECT(
