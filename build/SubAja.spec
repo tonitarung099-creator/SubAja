@@ -4,7 +4,8 @@ from pathlib import Path
 import os
 
 root = Path(os.getcwd()).resolve()
-logo = root / "assets" / "subaja-logo.png"\nicon = root / "assets" / "subaja.ico"
+logo = root / "assets" / "subaja-logo.png"
+icon = root / "assets" / "subaja.ico"
 
 datas = [
     (str(root / "assets" / "models" / "segmentation" / "model.int8.onnx"), "assets/models/segmentation"),
