@@ -159,11 +159,15 @@ class GeminiPunctuator:
 
     def test(self) -> str:
         try:
-            response = self._client().models.generate_content(
-                model=self.model,
-                contents="Balas hanya dengan kata OK.",
-                config=self._low_thinking_config(),
-            )
+            # Penting: tahan object Client selama request berlangsung.
+            # Pola self._client().models... dapat membuat Client sementara
+            # ter-GC dan menutup HTTP client sebelum request dikirim.
+            with self._client() as client:
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents="Balas hanya dengan kata OK.",
+                    config=self._low_thinking_config(),
+                )
             return (response.text or "").strip()
         except Exception as exc:
             msg = str(exc)
@@ -188,11 +192,14 @@ class GeminiPunctuator:
             "SUBTITLE:\n" + json.dumps(payload, ensure_ascii=False)
         )
         try:
-            response = self._client().models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=self._low_thinking_config(json_response=True),
-            )
+            # Gunakan context manager resmi agar client tetap hidup selama
+            # generate_content dan resource HTTP ditutup setelah request selesai.
+            with self._client() as client:
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=self._low_thinking_config(json_response=True),
+                )
             data = _extract_json(response.text or "")
             return _normalize_batch_response(data, {e.index for e in entries})
         except Exception as exc:
