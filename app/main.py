@@ -4,7 +4,9 @@ from pathlib import Path
 import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QCoreApplication, QTimer
+from PySide6.QtGui import QIcon
 
+from app.core.resources import resource_path
 from app.ui.main_window import MainWindow
 
 
@@ -26,6 +28,10 @@ def _runtime_smoke_check():
     if missing:
         raise RuntimeError("Model speaker runtime tidak ditemukan: " + ", ".join(missing))
 
+    logo = resource_path("assets/subaja-logo.png")
+    if not logo.is_file():
+        raise RuntimeError(f"Logo runtime tidak ditemukan: {logo}")
+
 
 def main():
     QCoreApplication.setOrganizationName("SubAja")
@@ -35,12 +41,17 @@ def main():
     qt_argv = [arg for arg in sys.argv if arg != "--smoke-test"]
     app = QApplication(qt_argv)
     app.setStyle("Fusion")
+
+    logo = resource_path("assets/subaja-logo.png")
+    if logo.is_file():
+        app.setWindowIcon(QIcon(str(logo)))
+
     window = MainWindow()
     window.show()
 
     if smoke_test:
-        # Dipakai CI untuk membuktikan EXE hasil PyInstaller benar-benar bisa
-        # startup DAN membawa dependency runtime speaker/Gemini yang diperlukan.
+        # Dipakai CI untuk membuktikan build portable benar-benar bisa startup
+        # dan membawa dependency runtime speaker/Gemini/FFmpeg/logo.
         _runtime_smoke_check()
         QTimer.singleShot(800, app.quit)
 
