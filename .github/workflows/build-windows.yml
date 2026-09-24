@@ -1,4 +1,4 @@
-name: Build SubAja Windows EXE
+name: Build SubAja Windows Portable
 
 on:
   workflow_dispatch:
@@ -53,29 +53,72 @@ jobs:
         shell: pwsh
         run: python -m pytest -q
 
-      - name: Build EXE
+      - name: Build portable folder
         shell: pwsh
         run: python -m PyInstaller --noconfirm --clean build/SubAja.spec
 
-      - name: Verify EXE
+      - name: Verify portable folder
         shell: pwsh
         run: |
-          if (!(Test-Path "dist/SubAja.exe")) { throw "SubAja.exe was not created" }
-          Get-Item "dist/SubAja.exe" | Format-List Name,Length,FullName
+          if (!(Test-Path "dist/SubAja/SubAja.exe")) { throw "dist/SubAja/SubAja.exe was not created" }
+          if (!(Test-Path "dist/SubAja/_internal")) { throw "Portable _internal folder was not created" }
+          if (!(Test-Path "dist/SubAja/_internal/assets/subaja-logo.png")) { throw "SubAja logo runtime asset is missing" }
+          $files = Get-ChildItem "dist/SubAja" -Recurse -File
+          if ($files.Count -lt 20) { throw "Portable folder unexpectedly contains too few files: $($files.Count)" }
+          Get-Item "dist/SubAja/SubAja.exe" | Format-List Name,Length,FullName
+          Write-Host "Portable files:" $files.Count
 
       - name: Smoke test packaged EXE
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
-          $process = Start-Process -FilePath "dist/SubAja.exe" -ArgumentList "--smoke-test" -PassThru -Wait
+          $process = Start-Process -FilePath "dist/SubAja/SubAja.exe" -ArgumentList "--smoke-test" -PassThru -Wait
           if ($process.ExitCode -ne 0) {
             throw "SubAja.exe smoke test failed with exit code $($process.ExitCode)"
           }
 
-      - name: Upload EXE
+      - name: Add portable readme
+        shell: pwsh
+        run: |
+          @"
+          SubAja Portable
+
+          Cara pakai:
+          1. Extract seluruh folder SubAja dari ZIP.
+          2. Jangan jalankan EXE langsung dari dalam ZIP.
+          3. Buka folder SubAja lalu jalankan SubAja.exe.
+          4. Folder _internal adalah bagian aplikasi dan jangan dihapus.
+          5. Tidak perlu installer dan tidak perlu hak Administrator.
+          "@ | Set-Content -Path "dist/SubAja/BACA_DULU.txt" -Encoding UTF8
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $zip = "dist/SubAja-Portable.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "dist/SubAja" -DestinationPath $zip -CompressionLevel Optimal
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
+          try {
+            $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace("\\", "/") })
+            if (-not ($names -contains "SubAja/SubAja.exe")) {
+              throw "ZIP does not contain SubAja/SubAja.exe"
+            }
+            $internalCount = @($names | Where-Object { $_ -like "SubAja/_internal/*" }).Count
+            if ($internalCount -lt 10) {
+              throw "ZIP _internal folder looks incomplete: $internalCount entries"
+            }
+            Write-Host "ZIP entries:" $names.Count
+          }
+          finally {
+            $archive.Dispose()
+          }
+
+      - name: Upload portable ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: SubAja-Windows-EXE
-          path: dist/SubAja.exe
+          name: SubAja-Windows-Portable
+          path: dist/SubAja-Portable.zip
           if-no-files-found: error
           retention-days: 30
