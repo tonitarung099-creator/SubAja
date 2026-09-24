@@ -4,10 +4,12 @@ from pathlib import Path
 import os
 
 root = Path(os.getcwd()).resolve()
+logo = root / "assets" / "subaja-logo.png"
 
 datas = [
     (str(root / "assets" / "models" / "segmentation" / "model.int8.onnx"), "assets/models/segmentation"),
     (str(root / "assets" / "models" / "nemo_en_titanet_small.onnx"), "assets/models"),
+    (str(logo), "assets"),
 ]
 binaries = []
 hiddenimports = []
@@ -36,12 +38,13 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# ONEDIR portable build:
+# SubAja.exe stays at the folder root, while runtime/DLL/resources live in _internal.
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="SubAja",
     debug=False,
     bootloader_ignore_signals=False,
@@ -55,5 +58,15 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=str(logo),
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name="SubAja",
 )
