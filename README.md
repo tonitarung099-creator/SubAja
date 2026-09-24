@@ -46,6 +46,10 @@ Gemini bersifat opsional. Speaker diarization, pemisahan dialog, formatting, QC,
 - Save/Resume Project (`.subaja.json`) untuk menyimpan hasil speaker, pembagian caption, koreksi, dan QC film panjang.
 - Export SRT bersih; label speaker opsional dan default-nya tidak ditampilkan.
 
+## Logo aplikasi
+
+Logo SubAja berada di `assets/subaja-logo.png` dan dipakai sebagai ikon jendela serta sumber ikon executable Windows.
+
 ## Menjalankan dari source
 
 Direkomendasikan Python 3.11 64-bit.
@@ -58,7 +62,9 @@ python scripts/download_models.py
 python run.py
 ```
 
-## Membuat Windows EXE
+## Build Windows Portable
+
+SubAja memakai **PyInstaller onedir**, bukan single-file EXE dan bukan installer.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1
@@ -67,14 +73,27 @@ powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1
 Hasil:
 
 ```text
-dist/SubAja.exe
+dist/
+├── SubAja/
+│   ├── SubAja.exe
+│   ├── _internal/
+│   │   ├── Python/runtime/DLL
+│   │   ├── PySide6
+│   │   ├── sherpa-onnx
+│   │   ├── FFmpeg
+│   │   ├── Google GenAI
+│   │   └── assets/models + logo
+│   └── BACA_DULU.txt
+└── SubAja-Portable.zip
 ```
 
-Workflow GitHub Actions juga tersedia untuk build otomatis pada Windows runner.
+Cara distribusi: **download satu ZIP → extract → buka folder SubAja → jalankan SubAja.exe**. Tidak perlu installer, setup, atau hak Administrator. Folder `_internal` merupakan bagian aplikasi dan tidak boleh dihapus.
+
+Workflow GitHub Actions membangun serta memverifikasi ZIP portable otomatis pada Windows runner.
 
 ## Model speaker
 
-Build memakai model speaker diarization offline yang didukung `sherpa-onnx`: model segmentasi Pyannote 3.0 ONNX int8 dan `nemo_en_titanet_small.onnx` sebagai speaker embedding extractor. Model diunduh oleh `scripts/download_models.py` saat build dan dibundel ke EXE.
+Build memakai model speaker diarization offline yang didukung `sherpa-onnx`: model segmentasi Pyannote 3.0 ONNX int8 dan `nemo_en_titanet_small.onnx` sebagai speaker embedding extractor. Model diunduh oleh `scripts/download_models.py` saat build dan dimasukkan ke folder portable.
 
 ## Catatan kualitas
 
